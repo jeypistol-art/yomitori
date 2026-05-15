@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.*.local
+.next
+.open-next
+.wrangler
+node_modules
+dist
+coverage
+*.tsbuildinfo
+tmp

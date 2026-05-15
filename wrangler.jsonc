@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "yomitori-docutask",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-08",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "r2_buckets": [
+    {
+      "binding": "YOMITORI_DOCUMENTS",
+      "bucket_name": "yomitori-docutask-documents"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "STRIPE_ALLOWED_COUNTRY": "JP",
+    "DATA_RETENTION_TRIAL_GRACE_DAYS": "14",
+    "DATA_RETENTION_CANCELED_GRACE_DAYS": "30",
+    "DATA_RETENTION_BATCH_SIZE": "50",
+    "OPENAI_DOCUMENT_EXTRACTION_MODEL": "gpt-4o-mini",
+    "DOCUMENT_PROCESSING_MAX_REPROCESS_COUNT": "3"
+  }
+}
+
