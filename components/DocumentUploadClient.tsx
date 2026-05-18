@@ -420,6 +420,12 @@ export default function DocumentUploadClient() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-start gap-2 text-[#2f5d50] md:justify-end">
+                    <Link
+                      href={`/documents/${document.id}/review`}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-bold text-[#2f5d50]"
+                    >
+                      確認
+                    </Link>
                     <button
                       type="button"
                       onClick={() => void extractDocument(document)}
