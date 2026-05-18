@@ -33,6 +33,7 @@ type DocumentItem = {
   summary: string | null;
   due_date: string | null;
   document_type: string;
+  source_type: string;
   status: string;
   file_count: number;
   created_at: string;
@@ -97,6 +98,7 @@ export default function DocumentUploadClient() {
   const [counterpartyId, setCounterpartyId] = useState("");
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [sourceText, setSourceText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [extractingDocumentId, setExtractingDocumentId] = useState<string | null>(null);
@@ -151,8 +153,8 @@ export default function DocumentUploadClient() {
   async function uploadDocument() {
     setError("");
     setMessage("");
-    if (files.length === 0) {
-      setError("ファイルを選択してください");
+    if (files.length === 0 && sourceText.trim().length === 0) {
+      setError("ファイルを選択するか、メール本文・通知文を貼り付けてください");
       return;
     }
 
@@ -161,6 +163,7 @@ export default function DocumentUploadClient() {
       const formData = new FormData();
       formData.set("title", title);
       formData.set("counterparty_id", counterpartyId);
+      formData.set("source_text", sourceText);
       selectedAssetIds.forEach((id) => formData.append("managed_asset_ids", id));
       files.forEach((file) => formData.append("files", file));
 
@@ -176,6 +179,7 @@ export default function DocumentUploadClient() {
       setCounterpartyId("");
       setSelectedAssetIds([]);
       setFiles([]);
+      setSourceText("");
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "アップロードに失敗しました");
@@ -277,6 +281,33 @@ export default function DocumentUploadClient() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold">
+              メール本文・通知文の貼り付け
+              <textarea
+                value={sourceText}
+                onChange={(event) => {
+                  setSourceText(event.target.value);
+                  if (!title) {
+                    const firstLine = event.target.value
+                      .split(/\r?\n/)
+                      .map((line) => line.trim())
+                      .find(Boolean);
+                    if (firstLine) {
+                      setTitle(firstLine.slice(0, 80));
+                    }
+                  }
+                }}
+                rows={8}
+                placeholder="メール本文、自治体からの通知文、チャットで届いた依頼文などを貼り付け"
+                className="mt-2 w-full resize-y rounded-md border border-[#cfd6ca] px-3 py-2 text-sm leading-6"
+              />
+            </label>
+            <p className="mt-2 text-xs leading-5 text-[#6b7280]">
+              PDF/画像がなくても、この本文だけで登録・AI抽出できます。
+            </p>
           </div>
 
           <div>
@@ -394,7 +425,9 @@ export default function DocumentUploadClient() {
                         {document.document_type}
                       </span>
                       <span className="text-xs font-semibold text-[#6b7280]">
-                        {document.file_count}ファイル
+                        {document.file_count > 0
+                          ? `${document.file_count}ファイル`
+                          : "本文"}
                       </span>
                     </div>
                     <h3 className="mt-2 break-words text-base font-bold">

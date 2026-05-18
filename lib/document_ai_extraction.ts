@@ -33,6 +33,7 @@ type DocumentContextRow = {
   organization_id: string;
   title: string;
   source_type: string;
+  source_text: string | null;
   counterparty_name: string | null;
   counterparty_type: string | null;
 };
@@ -281,6 +282,15 @@ function buildPrompt(args: {
     `入力種別: ${args.document.source_type}`,
     `選択済み取引先: ${args.document.counterparty_name ?? "なし"}`,
     `選択済み管理対象: ${args.assetNames.length > 0 ? args.assetNames.join(", ") : "なし"}`,
+    args.document.source_text
+      ? [
+          "",
+          "貼り付け本文:",
+          "```text",
+          args.document.source_text,
+          "```",
+        ].join("\n")
+      : "",
   ].join("\n");
 }
 
@@ -291,6 +301,7 @@ async function getDocumentContext(args: ExtractionInput) {
        d.organization_id,
        d.title,
        d.source_type::text AS source_type,
+       d.source_text,
        c.name AS counterparty_name,
        c.counterparty_type::text AS counterparty_type
      FROM documents d
@@ -320,8 +331,8 @@ async function getDocumentContext(args: ExtractionInput) {
     [args.organizationId, args.documentId]
   );
 
-  if (files.rows.length === 0) {
-    throw new Error("Document has no original files");
+  if (files.rows.length === 0 && !document.rows[0].source_text) {
+    throw new Error("Document has no original files or source text");
   }
 
   const assets = await query<{ name: string }>(
@@ -509,8 +520,8 @@ async function insertExtractedItems(args: {
 
 export async function runDocumentAiExtraction(args: ExtractionInput) {
   const context = await getDocumentContext(args);
-  const bucket = await getR2DocumentsBucket();
-  if (!bucket?.get) {
+  const bucket = context.files.length > 0 ? await getR2DocumentsBucket() : null;
+  if (context.files.length > 0 && !bucket?.get) {
     throw new Error("R2 bucket get is not configured");
   }
 
@@ -540,8 +551,11 @@ export async function runDocumentAiExtraction(args: ExtractionInput) {
   try {
     const filesWithData = [];
     const hash = crypto.createHash("sha256");
+    if (context.document.source_text) {
+      hash.update(context.document.source_text);
+    }
     for (const file of context.files.slice(0, 5)) {
-      const object = await bucket.get(file.storage_key);
+      const object = await bucket!.get!(file.storage_key);
       if (!object) {
         throw new Error(`R2 object not found: ${file.storage_key}`);
       }

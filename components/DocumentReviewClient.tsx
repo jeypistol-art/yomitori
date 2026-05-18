@@ -37,6 +37,7 @@ type ReviewPayload = {
     status: string;
     due_date: string | null;
     summary: string | null;
+    source_text: string | null;
     created_at: string;
     approved_at: string | null;
   };
@@ -467,9 +468,21 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
 
           <div className="min-h-[720px] bg-[#eef1ea] p-3">
             {!selectedFile ? (
-              <div className="flex h-[680px] items-center justify-center border border-dashed border-[#cfd6ca] bg-white text-sm text-[#5f6b5f]">
-                原本ファイルがありません
-              </div>
+              payload.document.source_text ? (
+                <div className="min-h-[680px] border border-[#d9ded3] bg-white p-4">
+                  <div className="mb-3 inline-flex items-center gap-2 rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
+                    <FileText className="h-4 w-4" />
+                    貼り付け本文
+                  </div>
+                  <pre className="whitespace-pre-wrap break-words text-sm leading-7 text-[#1f2933]">
+                    {payload.document.source_text}
+                  </pre>
+                </div>
+              ) : (
+                <div className="flex h-[680px] items-center justify-center border border-dashed border-[#cfd6ca] bg-white text-sm text-[#5f6b5f]">
+                  原本ファイルまたは貼り付け本文がありません
+                </div>
+              )
             ) : selectedFile.mime_type === "application/pdf" ? (
               <iframe
                 title="原本PDF"

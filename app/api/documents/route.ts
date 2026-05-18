@@ -32,6 +32,7 @@ type DocumentRow = {
 
 const MAX_FILES = 20;
 const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024;
+const MAX_SOURCE_TEXT_LENGTH = 100_000;
 
 function isUploadFile(value: FormDataEntryValue): value is File {
   return typeof value !== "string" && value.size > 0;
@@ -45,6 +46,16 @@ function inferSourceType(files: File[]) {
     return "image";
   }
   return "pdf";
+}
+
+function inferTitleFromText(value: string) {
+  return (
+    value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean)
+      ?.slice(0, 80) ?? null
+  );
 }
 
 function validateFile(file: File) {
@@ -96,7 +107,7 @@ export async function GET() {
          d.title,
          d.suggested_title,
          d.summary,
-         d.due_date,
+         d.due_date::text AS due_date,
          d.document_type::text AS document_type,
          d.source_type::text AS source_type,
          d.status::text AS status,
@@ -130,20 +141,24 @@ export async function POST(request: Request) {
     const { currentOrganization } = await requireApiContext();
     requireMasterDataWrite(currentOrganization);
 
-    const bucket = await getR2DocumentsBucket();
-    if (!bucket) {
-      throw new ApiError(500, "R2 bucket is not configured");
-    }
-
     const formData = await request.formData();
     const files = formData.getAll("files").filter(isUploadFile);
-    if (files.length === 0) {
-      throw new ApiError(400, "files is required");
+    const sourceText = normalizeNullableText(formData.get("source_text"));
+    if (files.length === 0 && !sourceText) {
+      throw new ApiError(400, "files or source_text is required");
     }
     if (files.length > MAX_FILES) {
       throw new ApiError(400, `files cannot exceed ${MAX_FILES}`);
     }
+    if (sourceText && sourceText.length > MAX_SOURCE_TEXT_LENGTH) {
+      throw new ApiError(400, "source_text exceeds 100000 characters");
+    }
     files.forEach(validateFile);
+
+    const bucket = files.length > 0 ? await getR2DocumentsBucket() : null;
+    if (files.length > 0 && !bucket) {
+      throw new ApiError(500, "R2 bucket is not configured");
+    }
 
     const counterpartyId = normalizeNullableText(formData.get("counterparty_id"));
     if (
@@ -169,9 +184,10 @@ export async function POST(request: Request) {
 
     const title =
       normalizeNullableText(formData.get("title")) ??
-      files[0].name.replace(/\.[^.]+$/, "") ??
+      files[0]?.name.replace(/\.[^.]+$/, "") ??
+      (sourceText ? inferTitleFromText(sourceText) : null) ??
       "無題の書類";
-    const sourceType = inferSourceType(files);
+    const sourceType = files.length > 0 ? inferSourceType(files) : "email_paste";
 
     const document = await query<{ id: string }>(
       `INSERT INTO documents (
@@ -180,9 +196,10 @@ export async function POST(request: Request) {
          counterparty_id,
          title,
          source_type,
+         source_text,
          status
        )
-       VALUES ($1, $2, $3, $4, $5, 'uploaded')
+       VALUES ($1, $2, $3, $4, $5, $6, 'uploaded')
        RETURNING id`,
       [
         currentOrganization.organization_id,
@@ -190,6 +207,7 @@ export async function POST(request: Request) {
         counterpartyId,
         title,
         sourceType,
+        sourceText,
       ]
     );
     documentId = document.rows[0].id;
@@ -212,7 +230,7 @@ export async function POST(request: Request) {
       const preparedFile = await prepareFile(file);
       const fileId = crypto.randomUUID();
       const storageKey = await uploadDocumentFileToR2({
-        bucket,
+        bucket: bucket!,
         organizationId: currentOrganization.organization_id,
         documentId,
         fileId,
@@ -255,11 +273,13 @@ export async function POST(request: Request) {
       storedFiles.push(fileRow.rows[0]);
     }
 
-    await query(
-      `INSERT INTO processing_jobs (organization_id, document_id, job_type, status)
-       VALUES ($1, $2, 'ocr', 'queued')`,
-      [currentOrganization.organization_id, documentId]
-    );
+    if (files.length > 0) {
+      await query(
+        `INSERT INTO processing_jobs (organization_id, document_id, job_type, status)
+         VALUES ($1, $2, 'ocr', 'queued')`,
+        [currentOrganization.organization_id, documentId]
+      );
+    }
 
     return NextResponse.json(
       {
