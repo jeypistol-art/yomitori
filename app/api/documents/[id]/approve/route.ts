@@ -12,6 +12,8 @@ type DraftRecord = Record<string, unknown>;
 
 type TaskCandidate = {
   title?: unknown;
+  action?: unknown;
+  task?: unknown;
   description?: unknown;
   due_date?: unknown;
   priority?: unknown;
@@ -57,6 +59,24 @@ function normalizeDate(value: unknown) {
   return text && /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 
+function pickDate(record: DraftRecord) {
+  return (
+    normalizeDate(record.date) ??
+    normalizeDate(record.due_date) ??
+    normalizeDate(record["重要な日付"])
+  );
+}
+
+function firstText(record: DraftRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = normalizeText(record[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function jsonString(value: unknown) {
   return JSON.stringify(value ?? null);
 }
@@ -94,7 +114,15 @@ function extractKeyPoints(draft: DraftRecord) {
       if (typeof point === "string") {
         return point;
       }
-      return normalizeText(asRecord(point).text);
+      return firstText(asRecord(point), [
+        "text",
+        "key_point",
+        "point",
+        "content",
+        "内容",
+        "title",
+        "description",
+      ]);
     })
     .filter((value): value is string => Boolean(value));
 }
@@ -103,7 +131,12 @@ function extractPrimaryDueDate(draft: DraftRecord) {
   const primaryDate = asArray(draft.important_dates)
     .map(asRecord)
     .find((item) => item.is_primary_due_date === true);
-  return normalizeDate(primaryDate?.date) ?? normalizeDate(asRecord(asArray(draft.required_actions)[0]).due_date);
+  return (
+    (primaryDate ? pickDate(primaryDate) : null) ??
+    pickDate(asRecord(asArray(draft.important_dates)[0])) ??
+    pickDate(asRecord(asArray(draft.required_actions)[0])) ??
+    pickDate(asRecord(asArray(draft.task_candidates)[0]))
+  );
 }
 
 function getTaskCandidates(draft: DraftRecord): TaskCandidate[] {
@@ -236,7 +269,7 @@ export async function POST(request: Request, context: RouteContext) {
         if (task.create_by_default === false) {
           continue;
         }
-        const title = normalizeText(task.title);
+        const title = firstText(asRecord(task), ["title", "task", "action", "label"]);
         if (!title) {
           continue;
         }
@@ -263,7 +296,7 @@ export async function POST(request: Request, context: RouteContext) {
             currentOrganization.organization_id,
             id,
             title,
-            normalizeText(task.description),
+            firstText(asRecord(task), ["description", "detail", "reason"]),
             assigneeId,
             currentOrganization.member_id,
             due,

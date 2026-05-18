@@ -98,6 +98,16 @@ function asString(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function firstString(record: JsonRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+  return "";
+}
+
 function splitLines(value: string) {
   return value
     .split("\n")
@@ -559,7 +569,17 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
               <DraftTextArea
                 label="重要事項"
                 value={asArray(summary.key_points)
-                  .map((point) => asString(point.text))
+                  .map((point) =>
+                    firstString(point, [
+                      "text",
+                      "key_point",
+                      "point",
+                      "content",
+                      "内容",
+                      "title",
+                      "description",
+                    ])
+                  )
                   .filter(Boolean)
                   .join("\n")}
                 onChange={(value) =>
@@ -689,7 +709,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                     </label>
                     <DraftTextField
                       label="タスク名"
-                      value={asString(task.title)}
+                      value={firstString(task, ["title", "task", "action", "label"])}
                       onChange={(value) =>
                         updateArrayItem(
                           asArray(draft.task_candidates).length
@@ -703,7 +723,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                     />
                     <DraftTextArea
                       label="説明"
-                      value={asString(task.description)}
+                      value={firstString(task, ["description", "detail", "reason"])}
                       onChange={(value) =>
                         updateArrayItem(
                           asArray(draft.task_candidates).length

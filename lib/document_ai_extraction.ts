@@ -199,10 +199,35 @@ function normalizeDate(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
+function pickDate(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    normalizeDate(record.date) ??
+    normalizeDate(record.due_date) ??
+    normalizeDate(record["重要な日付"])
+  );
+}
+
 function normalizeDocumentType(value: unknown): DocumentType {
   return DOCUMENT_TYPES.includes(value as DocumentType)
     ? (value as DocumentType)
     : "unknown";
+}
+
+function pickText(value: unknown, keys: string[]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of keys) {
+    if (typeof record[key] === "string" && record[key].trim()) {
+      return record[key].trim();
+    }
+  }
+  return null;
 }
 
 function getOverallConfidence(output: AiExtractionOutput) {
@@ -211,7 +236,12 @@ function getOverallConfidence(output: AiExtractionOutput) {
 
 function extractPrimaryDueDate(output: AiExtractionOutput) {
   const primary = output.important_dates.find((item) => item.is_primary_due_date);
-  return normalizeDate(primary?.date) ?? normalizeDate(output.required_actions[0]?.due_date);
+  return (
+    pickDate(primary) ??
+    pickDate(output.important_dates[0]) ??
+    pickDate(output.required_actions[0]) ??
+    pickDate(output.task_candidates[0])
+  );
 }
 
 function extractSummary(output: AiExtractionOutput) {
@@ -225,7 +255,17 @@ function extractSummary(output: AiExtractionOutput) {
 
 function extractKeyPoints(output: AiExtractionOutput) {
   return (output.document_summary?.key_points ?? [])
-    .map((point) => point.text)
+    .map((point) =>
+      pickText(point, [
+        "text",
+        "key_point",
+        "point",
+        "content",
+        "内容",
+        "title",
+        "description",
+      ])
+    )
     .filter((text): text is string => Boolean(text));
 }
 
@@ -449,17 +489,18 @@ async function insertExtractedItems(args: {
       type: "due_date",
       label: date.label ?? date.date_type ?? "重要日付",
       text: date.description ?? date.raw_date_text ?? null,
-      date: normalizeDate(date.date),
+      date: pickDate(date),
       json: date,
       confidence: clampConfidence(date.confidence?.score),
     });
   }
 
   for (const action of args.output.required_actions ?? []) {
+    const label = action.title ?? pickText(action, ["action", "task", "label"]);
     items.push({
       type: "required_action",
-      label: action.title ?? "必要対応",
-      text: action.description ?? null,
+      label: label ?? "必要対応",
+      text: action.description ?? label ?? null,
       date: normalizeDate(action.due_date),
       json: action,
       confidence: clampConfidence(action.confidence?.score),
@@ -478,10 +519,11 @@ async function insertExtractedItems(args: {
   }
 
   for (const task of args.output.task_candidates ?? []) {
+    const label = task.title ?? pickText(task, ["task", "action", "label"]);
     items.push({
       type: "task",
-      label: task.title ?? "タスク候補",
-      text: task.description ?? null,
+      label: label ?? "タスク候補",
+      text: task.description ?? label ?? null,
       date: normalizeDate(task.due_date),
       json: task,
       confidence: clampConfidence(task.confidence?.score),
