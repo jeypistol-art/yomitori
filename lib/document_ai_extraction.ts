@@ -207,6 +207,8 @@ function pickDate(value: unknown) {
   return (
     normalizeDate(record.date) ??
     normalizeDate(record.due_date) ??
+    normalizeDate(record.deadline) ??
+    normalizeDate(record["期限"]) ??
     normalizeDate(record["重要な日付"])
   );
 }
@@ -501,7 +503,7 @@ async function insertExtractedItems(args: {
       type: "required_action",
       label: label ?? "必要対応",
       text: action.description ?? label ?? null,
-      date: normalizeDate(action.due_date),
+      date: pickDate(action),
       json: action,
       confidence: clampConfidence(action.confidence?.score),
     });
@@ -524,7 +526,7 @@ async function insertExtractedItems(args: {
       type: "task",
       label: label ?? "タスク候補",
       text: task.description ?? label ?? null,
-      date: normalizeDate(task.due_date),
+      date: pickDate(task),
       json: task,
       confidence: clampConfidence(task.confidence?.score),
     });

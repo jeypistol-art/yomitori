@@ -37,6 +37,32 @@ export async function GET(_request: Request, context: RouteContext) {
          d.approved_at,
          d.created_at,
          d.updated_at,
+         (
+           SELECT count(DISTINCT d2.id)::int
+           FROM documents d2
+           LEFT JOIN document_files df
+             ON df.organization_id = d.organization_id
+            AND df.document_id = d.id
+            AND df.deleted_at IS NULL
+           LEFT JOIN document_files df2
+             ON df2.organization_id = d2.organization_id
+            AND df2.document_id = d2.id
+            AND df2.deleted_at IS NULL
+           WHERE d2.organization_id = d.organization_id
+             AND d2.id <> d.id
+             AND d2.deleted_at IS NULL
+             AND (
+               (
+                 d.source_text IS NOT NULL
+                 AND d2.source_text IS NOT NULL
+                 AND md5(d2.source_text) = md5(d.source_text)
+               )
+               OR (
+                 df.sha256 IS NOT NULL
+                 AND df2.sha256 = df.sha256
+               )
+             )
+         ) AS duplicate_count,
          c.id AS counterparty_id,
          c.name AS counterparty_name
        FROM documents d

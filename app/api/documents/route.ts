@@ -28,6 +28,7 @@ type DocumentRow = {
   created_at: string;
   updated_at: string;
   file_count: number;
+  duplicate_count: number;
 };
 
 const MAX_FILES = 20;
@@ -114,7 +115,38 @@ export async function GET() {
          d.counterparty_id,
          d.created_at,
          d.updated_at,
-         count(df.id)::int AS file_count
+         count(DISTINCT df.id)::int AS file_count,
+         (
+           SELECT count(DISTINCT d2.id)::int
+           FROM documents d2
+           LEFT JOIN document_files df2
+             ON df2.organization_id = d2.organization_id
+            AND df2.document_id = d2.id
+            AND df2.deleted_at IS NULL
+           WHERE d2.organization_id = d.organization_id
+             AND d2.id <> d.id
+             AND d2.deleted_at IS NULL
+             AND (
+               (
+                 d.source_text IS NOT NULL
+                 AND d2.source_text IS NOT NULL
+                 AND md5(d2.source_text) = md5(d.source_text)
+               )
+               OR EXISTS (
+                 SELECT 1
+                 FROM document_files df_self
+                 JOIN document_files df_other
+                   ON df_other.organization_id = df_self.organization_id
+                  AND df_other.document_id = d2.id
+                  AND df_other.deleted_at IS NULL
+                  AND df_other.sha256 = df_self.sha256
+                 WHERE df_self.organization_id = d.organization_id
+                   AND df_self.document_id = d.id
+                   AND df_self.deleted_at IS NULL
+                   AND df_self.sha256 IS NOT NULL
+               )
+             )
+         ) AS duplicate_count
        FROM documents d
        LEFT JOIN document_files df
          ON df.organization_id = d.organization_id
@@ -281,6 +313,39 @@ export async function POST(request: Request) {
       );
     }
 
+    const duplicates = await query<{ id: string; title: string; created_at: string }>(
+      `SELECT DISTINCT d2.id, d2.title, d2.created_at
+       FROM documents d
+       JOIN documents d2
+         ON d2.organization_id = d.organization_id
+        AND d2.id <> d.id
+        AND d2.deleted_at IS NULL
+       LEFT JOIN document_files df
+         ON df.organization_id = d.organization_id
+        AND df.document_id = d.id
+        AND df.deleted_at IS NULL
+       LEFT JOIN document_files df2
+         ON df2.organization_id = d2.organization_id
+        AND df2.document_id = d2.id
+        AND df2.deleted_at IS NULL
+       WHERE d.organization_id = $1
+         AND d.id = $2
+         AND (
+           (
+             d.source_text IS NOT NULL
+             AND d2.source_text IS NOT NULL
+             AND md5(d2.source_text) = md5(d.source_text)
+           )
+           OR (
+             df.sha256 IS NOT NULL
+             AND df2.sha256 = df.sha256
+           )
+         )
+       ORDER BY d2.created_at DESC
+       LIMIT 5`,
+      [currentOrganization.organization_id, documentId]
+    );
+
     return NextResponse.json(
       {
         data: {
@@ -289,6 +354,7 @@ export async function POST(request: Request) {
           status: "uploaded",
           file_count: storedFiles.length,
           files: storedFiles,
+          duplicates: duplicates.rows,
         },
       },
       { status: 201 }

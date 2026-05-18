@@ -63,6 +63,8 @@ function pickDate(record: DraftRecord) {
   return (
     normalizeDate(record.date) ??
     normalizeDate(record.due_date) ??
+    normalizeDate(record.deadline) ??
+    normalizeDate(record["期限"]) ??
     normalizeDate(record["重要な日付"])
   );
 }
@@ -264,6 +266,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
 
     const createdTasks: Array<{ id: string; title: string }> = [];
+    const fallbackDueDate = extractPrimaryDueDate(draft);
     if (body.create_tasks !== false) {
       for (const task of getTaskCandidates(draft)) {
         if (task.create_by_default === false) {
@@ -273,7 +276,7 @@ export async function POST(request: Request, context: RouteContext) {
         if (!title) {
           continue;
         }
-        const due = normalizeDate(task.due_date);
+        const due = pickDate(asRecord(task)) ?? fallbackDueDate;
         const priorityValue = normalizeText(task.priority);
         const priority = priorityValue && taskPriorities.has(priorityValue) ? priorityValue : "normal";
         const assigneeId = normalizeText(task.assignee_member_id);

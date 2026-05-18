@@ -12,11 +12,14 @@ async function ensureUserAndDefaultOrganization(args: {
   const userResult = await query<{ id: string }>(
     `INSERT INTO users (email, name, avatar_url, auth_provider, auth_provider_subject, last_login_at)
      VALUES ($1, $2, $3, 'google', $4, now())
-     ON CONFLICT (auth_provider, auth_provider_subject)
+     ON CONFLICT (email)
      DO UPDATE SET
+       auth_provider = 'google',
+       auth_provider_subject = EXCLUDED.auth_provider_subject,
        email = EXCLUDED.email,
        name = COALESCE(EXCLUDED.name, users.name),
        avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+       deleted_at = NULL,
        last_login_at = now(),
        updated_at = now()
      RETURNING id`,

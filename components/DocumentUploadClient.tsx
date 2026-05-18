@@ -8,6 +8,7 @@ import {
   FileText,
   Sparkles,
   Loader2,
+  Trash2,
   Upload,
   Users,
   X,
@@ -36,6 +37,7 @@ type DocumentItem = {
   source_type: string;
   status: string;
   file_count: number;
+  duplicate_count: number;
   created_at: string;
 };
 
@@ -49,6 +51,7 @@ type UploadResponse = {
     title: string;
     status: string;
     file_count: number;
+    duplicates?: Array<{ id: string; title: string }>;
   };
 };
 
@@ -173,7 +176,9 @@ export default function DocumentUploadClient() {
       });
 
       setMessage(
-        `${payload.data.title} を登録しました。OCR処理ジョブをキューに追加しています。`
+        payload.data.duplicates && payload.data.duplicates.length > 0
+          ? `${payload.data.title} を登録しました。既存の類似/同一書類が ${payload.data.duplicates.length}件あります。`
+          : `${payload.data.title} を登録しました。OCR処理ジョブをキューに追加しています。`
       );
       setTitle("");
       setCounterpartyId("");
@@ -202,6 +207,21 @@ export default function DocumentUploadClient() {
       setError(err instanceof Error ? err.message : "AI抽出に失敗しました");
     } finally {
       setExtractingDocumentId(null);
+    }
+  }
+
+  async function deleteDocument(document: DocumentItem) {
+    if (!window.confirm(`${document.title} を削除しますか。`)) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      await fetchJson(`/api/documents/${document.id}`, { method: "DELETE" });
+      setMessage(`${document.title} を削除しました`);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "削除に失敗しました");
     }
   }
 
@@ -429,6 +449,11 @@ export default function DocumentUploadClient() {
                           ? `${document.file_count}ファイル`
                           : "本文"}
                       </span>
+                      {document.duplicate_count > 0 ? (
+                        <span className="rounded bg-[#fff8eb] px-2 py-1 text-xs font-bold text-[#9a5b13]">
+                          重複候補 {document.duplicate_count}件
+                        </span>
+                      ) : null}
                     </div>
                     <h3 className="mt-2 break-words text-base font-bold">
                       {document.suggested_title ?? document.title}
@@ -471,6 +496,14 @@ export default function DocumentUploadClient() {
                         <Sparkles className="h-4 w-4" />
                       )}
                       AI抽出
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteDocument(document)}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-[#f1c9c3] px-3 text-sm font-bold text-[#9a3412]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      削除
                     </button>
                     <FileText className="h-5 w-5" />
                     <CheckCircle2 className="h-5 w-5" />

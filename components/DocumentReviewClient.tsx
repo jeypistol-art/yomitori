@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Save,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 type JsonRecord = Record<string, unknown>;
@@ -40,6 +41,7 @@ type ReviewPayload = {
     source_text: string | null;
     created_at: string;
     approved_at: string | null;
+    duplicate_count?: number;
   };
   files: ReviewFile[];
   assets: Array<{ id: string; name: string; asset_type: string }>;
@@ -94,6 +96,10 @@ function asArray(value: unknown): JsonRecord[] {
   return Array.isArray(value) ? value.map(asRecord) : [];
 }
 
+function asUnknownArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function asString(value: unknown) {
   return typeof value === "string" ? value : "";
 }
@@ -106,6 +112,10 @@ function firstString(record: JsonRecord, keys: string[]) {
     }
   }
   return "";
+}
+
+function firstDateString(record: JsonRecord) {
+  return firstString(record, ["date", "due_date", "deadline", "期限", "重要な日付"]);
 }
 
 function splitLines(value: string) {
@@ -210,6 +220,8 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -242,15 +254,27 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   const summary = asRecord(draft.document_summary);
   const classification = asRecord(draft.document_classification);
   const importantDates = asArray(draft.important_dates);
+  const primaryDueDate =
+    firstDateString(
+      importantDates.find((item) => item.is_primary_due_date === true) ?? {}
+    ) || firstDateString(importantDates[0] ?? {});
   const requiredDocuments = asArray(draft.required_documents);
   const taskCandidates = asArray(draft.task_candidates).length
     ? asArray(draft.task_candidates)
     : asArray(draft.required_actions);
   const risks = asArray(draft.risks_and_notes);
   const warnings = [
-    ...asArray(draft.warnings).map((item) => asString(item.message) || JSON.stringify(item)),
-    ...asArray(draft.missing_information).map(
-      (item) => asString(item.message) || JSON.stringify(item)
+    ...asUnknownArray(draft.warnings).map((item) =>
+      typeof item === "string"
+        ? item
+        : firstString(asRecord(item), ["message", "text", "description"]) || JSON.stringify(item)
+    ),
+    ...asUnknownArray(draft.missing_information).map(
+      (item) =>
+        typeof item === "string"
+          ? item
+          : firstString(asRecord(item), ["message", "text", "description"]) ||
+            JSON.stringify(item)
     ),
   ].filter(Boolean);
 
@@ -342,12 +366,31 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   async function rerunExtraction() {
     setError("");
     setMessage("");
+    setIsExtracting(true);
     try {
       await fetchJson(`/api/documents/${documentId}/extract`, { method: "POST" });
       setMessage("AI抽出を再実行しました");
       await loadReview();
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI抽出に失敗しました");
+    } finally {
+      setIsExtracting(false);
+    }
+  }
+
+  async function deleteDocument() {
+    if (!window.confirm(`${payload?.document.title ?? "この書類"} を削除しますか。`)) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    setIsDeleting(true);
+    try {
+      await fetchJson(`/api/documents/${documentId}`, { method: "DELETE" });
+      window.location.href = "/documents/new";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "削除に失敗しました");
+      setIsDeleting(false);
     }
   }
 
@@ -397,10 +440,15 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
             <button
               type="button"
               onClick={() => void rerunExtraction()}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-bold text-[#2f5d50]"
+              disabled={isExtracting}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-bold text-[#2f5d50] disabled:opacity-60"
             >
-              <Sparkles className="h-4 w-4" />
-              再解析
+              {isExtracting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {isExtracting ? "再解析中" : "再解析"}
             </button>
             <button
               type="button"
@@ -423,6 +471,19 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                 <CheckCircle2 className="h-4 w-4" />
               )}
               承認してタスク作成
+            </button>
+            <button
+              type="button"
+              onClick={() => void deleteDocument()}
+              disabled={isDeleting}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#f1c9c3] px-3 text-sm font-bold text-[#9a3412] disabled:opacity-60"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              削除
             </button>
           </div>
         </div>
@@ -517,7 +578,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
         </section>
 
         <section className="space-y-4">
-          {warnings.length > 0 || payload.assets.length === 0 ? (
+          {warnings.length > 0 || payload.assets.length === 0 || (payload.document.duplicate_count ?? 0) > 0 ? (
             <div className="border border-[#f1d3a8] bg-[#fff8eb] p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 text-[#9a5b13]" />
@@ -526,6 +587,12 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                   <ul className="mt-2 space-y-1 text-sm leading-6 text-[#6b4a1f]">
                     {payload.assets.length === 0 ? (
                       <li>管理対象が未設定です。台帳で探しにくくなる可能性があります。</li>
+                    ) : null}
+                    {(payload.document.duplicate_count ?? 0) > 0 ? (
+                      <li>
+                        同一または類似の登録済み書類が {payload.document.duplicate_count}
+                        件あります。
+                      </li>
                     ) : null}
                     {warnings.slice(0, 5).map((warning, index) => (
                       <li key={`${warning}-${index}`}>{warning}</li>
@@ -610,7 +677,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                     />
                     <DraftTextField
                       label="日付"
-                      value={asString(item.date)}
+                      value={firstString(item, ["date", "due_date", "deadline", "期限", "重要な日付"])}
                       onChange={(value) =>
                         updateArrayItem("important_dates", index, "date", value)
                       }
@@ -739,7 +806,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                     <div className="grid gap-2 sm:grid-cols-3">
                       <DraftTextField
                         label="期限"
-                        value={asString(task.due_date)}
+                        value={firstDateString(task) || primaryDueDate}
                         onChange={(value) =>
                           updateArrayItem(
                             asArray(draft.task_candidates).length
@@ -776,7 +843,12 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                         </select>
                       </label>
                       <label className="block">
-                        <span className="text-xs font-bold text-[#4b5563]">担当者</span>
+                        <span className="flex items-center justify-between gap-2 text-xs font-bold text-[#4b5563]">
+                          担当者
+                          <a href="/team" className="text-[#2f5d50]">
+                            担当者設定
+                          </a>
+                        </span>
                         <select
                           value={asString(task.assignee_member_id)}
                           onChange={(event) =>
