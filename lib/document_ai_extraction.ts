@@ -199,18 +199,89 @@ function normalizeDate(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
-function pickDate(value: unknown) {
+function parseJapaneseEraDate(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const match = value.match(/(令和|平成|昭和)(元|\d{1,2})年\s*(\d{1,2})月\s*(\d{1,2})日/);
+  if (!match) {
+    return null;
+  }
+  const era = match[1];
+  const eraYear = match[2] === "元" ? 1 : Number(match[2]);
+  const month = Number(match[3]);
+  const day = Number(match[4]);
+  const baseYear = era === "令和" ? 2018 : era === "平成" ? 1988 : 1925;
+  if (!Number.isInteger(eraYear) || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  return `${baseYear + eraYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseJapaneseEraDates(value: string | null) {
+  if (!value) {
+    return [];
+  }
+  const dates: string[] = [];
+  const pattern = /(令和|平成|昭和)(元|\d{1,2})年\s*(\d{1,2})月\s*(\d{1,2})日/g;
+  for (const match of value.matchAll(pattern)) {
+    const parsed = parseJapaneseEraDate(match[0]);
+    if (parsed) {
+      dates.push(parsed);
+    }
+  }
+  return dates;
+}
+
+function correctDateWithSource(value: unknown, sourceText: string | null) {
+  const parsed = parseJapaneseEraDate(value);
+  if (parsed) {
+    return parsed;
+  }
+
+  const normalized = normalizeDate(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const [, month, day] = normalized.split("-");
+  const sourceMatch = parseJapaneseEraDates(sourceText).find(
+    (date) => date.slice(5) === `${month}-${day}`
+  );
+  return sourceMatch ?? normalized;
+}
+
+function pickDate(value: unknown, sourceText: string | null = null) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
   const record = value as Record<string, unknown>;
   return (
-    normalizeDate(record.date) ??
-    normalizeDate(record.due_date) ??
-    normalizeDate(record.deadline) ??
-    normalizeDate(record["期限"]) ??
-    normalizeDate(record["重要な日付"])
+    correctDateWithSource(record.date, sourceText) ??
+    correctDateWithSource(record.due_date, sourceText) ??
+    correctDateWithSource(record.deadline, sourceText) ??
+    correctDateWithSource(record["期限"], sourceText) ??
+    correctDateWithSource(record["重要な日付"], sourceText)
   );
+}
+
+function normalizeExtractionDates(value: unknown, sourceText: string | null): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeExtractionDates(item, sourceText));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const output: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    const shouldTreatAsDate = ["date", "due_date", "deadline", "期限", "重要な日付"].includes(key);
+    output[key] =
+      shouldTreatAsDate && typeof nestedValue === "string"
+        ? correctDateWithSource(nestedValue, sourceText) ?? nestedValue
+        : normalizeExtractionDates(nestedValue, sourceText);
+  }
+  return output;
 }
 
 function normalizeDocumentType(value: unknown): DocumentType {
@@ -256,7 +327,7 @@ function extractSummary(output: AiExtractionOutput) {
 }
 
 function extractKeyPoints(output: AiExtractionOutput) {
-  return (output.document_summary?.key_points ?? [])
+  const keyPoints = (output.document_summary?.key_points ?? [])
     .map((point) =>
       pickText(point, [
         "text",
@@ -269,6 +340,7 @@ function extractKeyPoints(output: AiExtractionOutput) {
       ])
     )
     .filter((text): text is string => Boolean(text));
+  return keyPoints.length > 0 ? keyPoints : output.document_summary?.short_summary ?? [];
 }
 
 function extractRisks(output: AiExtractionOutput) {
@@ -498,7 +570,9 @@ async function insertExtractedItems(args: {
   }
 
   for (const action of args.output.required_actions ?? []) {
-    const label = action.title ?? pickText(action, ["action", "task", "label"]);
+    const label =
+      action.title ??
+      pickText(action, ["action", "action_description", "task", "task_description", "label"]);
     items.push({
       type: "required_action",
       label: label ?? "必要対応",
@@ -510,10 +584,19 @@ async function insertExtractedItems(args: {
   }
 
   for (const requiredDocument of args.output.required_documents ?? []) {
+    const label =
+      requiredDocument.name ??
+      pickText(requiredDocument, [
+        "document_name",
+        "document",
+        "document_type",
+        "name",
+        "label",
+      ]);
     items.push({
       type: "required_document",
-      label: requiredDocument.name ?? "提出物",
-      text: requiredDocument.description ?? null,
+      label: label ?? "提出物",
+      text: requiredDocument.description ?? label ?? null,
       date: normalizeDate(requiredDocument.due_date),
       json: requiredDocument,
       confidence: clampConfidence(requiredDocument.confidence?.score),
@@ -521,7 +604,9 @@ async function insertExtractedItems(args: {
   }
 
   for (const task of args.output.task_candidates ?? []) {
-    const label = task.title ?? pickText(task, ["task", "action", "label"]);
+    const label =
+      task.title ??
+      pickText(task, ["task", "task_description", "action", "action_description", "label"]);
     items.push({
       type: "task",
       label: label ?? "タスク候補",
@@ -619,7 +704,10 @@ export async function runDocumentAiExtraction(args: ExtractionInput) {
       files: filesWithData,
     });
     const text = getResponseText(response);
-    const output = JSON.parse(text) as AiExtractionOutput;
+    const output = normalizeExtractionDates(
+      JSON.parse(text),
+      context.document.source_text
+    ) as AiExtractionOutput;
 
     const confidence = getOverallConfidence(output);
     await query(

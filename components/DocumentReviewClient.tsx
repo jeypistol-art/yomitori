@@ -714,7 +714,13 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                   <div key={index} className="grid gap-2 border border-[#e5e9df] p-3">
                     <DraftTextField
                       label="提出物名"
-                      value={asString(item.name)}
+                      value={firstString(item, [
+                        "name",
+                        "document_name",
+                        "document",
+                        "document_type",
+                        "label",
+                      ])}
                       onChange={(value) =>
                         updateArrayItem("required_documents", index, "name", value)
                       }
@@ -776,7 +782,14 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                     </label>
                     <DraftTextField
                       label="タスク名"
-                      value={firstString(task, ["title", "task", "action", "label"])}
+                      value={firstString(task, [
+                        "title",
+                        "task",
+                        "task_description",
+                        "action",
+                        "action_description",
+                        "label",
+                      ])}
                       onChange={(value) =>
                         updateArrayItem(
                           asArray(draft.task_candidates).length
@@ -790,7 +803,13 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                     />
                     <DraftTextArea
                       label="説明"
-                      value={firstString(task, ["description", "detail", "reason"])}
+                      value={firstString(task, [
+                        "description",
+                        "detail",
+                        "reason",
+                        "task_description",
+                        "action_description",
+                      ])}
                       onChange={(value) =>
                         updateArrayItem(
                           asArray(draft.task_candidates).length

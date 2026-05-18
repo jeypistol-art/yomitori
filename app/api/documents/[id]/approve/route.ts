@@ -272,7 +272,14 @@ export async function POST(request: Request, context: RouteContext) {
         if (task.create_by_default === false) {
           continue;
         }
-        const title = firstText(asRecord(task), ["title", "task", "action", "label"]);
+        const title = firstText(asRecord(task), [
+          "title",
+          "task",
+          "task_description",
+          "action",
+          "action_description",
+          "label",
+        ]);
         if (!title) {
           continue;
         }
@@ -299,7 +306,13 @@ export async function POST(request: Request, context: RouteContext) {
             currentOrganization.organization_id,
             id,
             title,
-            firstText(asRecord(task), ["description", "detail", "reason"]),
+            firstText(asRecord(task), [
+              "description",
+              "detail",
+              "reason",
+              "task_description",
+              "action_description",
+            ]),
             assigneeId,
             currentOrganization.member_id,
             due,
