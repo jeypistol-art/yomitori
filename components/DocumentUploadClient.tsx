@@ -6,6 +6,7 @@ import {
   Building2,
   CheckCircle2,
   FileText,
+  Sparkles,
   Loader2,
   Upload,
   Users,
@@ -28,6 +29,10 @@ type Counterparty = {
 type DocumentItem = {
   id: string;
   title: string;
+  suggested_title: string | null;
+  summary: string | null;
+  due_date: string | null;
+  document_type: string;
   status: string;
   file_count: number;
   created_at: string;
@@ -94,6 +99,7 @@ export default function DocumentUploadClient() {
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [extractingDocumentId, setExtractingDocumentId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -175,6 +181,23 @@ export default function DocumentUploadClient() {
       setError(err instanceof Error ? err.message : "アップロードに失敗しました");
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function extractDocument(document: DocumentItem) {
+    setExtractingDocumentId(document.id);
+    setError("");
+    setMessage("");
+    try {
+      await fetchJson(`/api/documents/${document.id}/extract`, {
+        method: "POST",
+      });
+      setMessage(`${document.title} のAI抽出が完了しました`);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI抽出に失敗しました");
+    } finally {
+      setExtractingDocumentId(null);
     }
   }
 
@@ -367,18 +390,49 @@ export default function DocumentUploadClient() {
                       <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
                         {document.status}
                       </span>
+                      <span className="rounded bg-[#f3f4f6] px-2 py-1 text-xs font-bold text-[#4b5563]">
+                        {document.document_type}
+                      </span>
                       <span className="text-xs font-semibold text-[#6b7280]">
                         {document.file_count}ファイル
                       </span>
                     </div>
                     <h3 className="mt-2 break-words text-base font-bold">
-                      {document.title}
+                      {document.suggested_title ?? document.title}
                     </h3>
+                    {document.suggested_title ? (
+                      <p className="mt-1 break-words text-xs text-[#6b7280]">
+                        元タイトル: {document.title}
+                      </p>
+                    ) : null}
+                    {document.summary ? (
+                      <p className="mt-2 break-words text-sm leading-6 text-[#4b5563]">
+                        {document.summary}
+                      </p>
+                    ) : null}
+                    {document.due_date ? (
+                      <p className="mt-2 text-sm font-bold text-[#8a3a2b]">
+                        期限: {document.due_date}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-xs text-[#6b7280]">
                       {new Date(document.created_at).toLocaleString("ja-JP")}
                     </p>
                   </div>
-                  <div className="flex items-start gap-2 text-[#2f5d50]">
+                  <div className="flex flex-wrap items-start gap-2 text-[#2f5d50] md:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void extractDocument(document)}
+                      disabled={extractingDocumentId === document.id}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-bold text-[#2f5d50] disabled:opacity-60"
+                    >
+                      {extractingDocumentId === document.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                      AI抽出
+                    </button>
                     <FileText className="h-5 w-5" />
                     <CheckCircle2 className="h-5 w-5" />
                   </div>

@@ -18,6 +18,9 @@ import {
 type DocumentRow = {
   id: string;
   title: string;
+  suggested_title: string | null;
+  summary: string | null;
+  due_date: string | null;
   document_type: string;
   source_type: string;
   status: string;
@@ -91,6 +94,9 @@ export async function GET() {
       `SELECT
          d.id,
          d.title,
+         d.suggested_title,
+         d.summary,
+         d.due_date,
          d.document_type::text AS document_type,
          d.source_type::text AS source_type,
          d.status::text AS status,
