@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
-import { normalizeNullableText, requireMasterDataWrite } from "@/lib/master_data";
+import { normalizeNullableText } from "@/lib/master_data";
+import { requireAdminWrite } from "@/lib/permissions";
 
 const memberRoles = new Set(["owner", "admin", "member", "viewer"]);
 
@@ -56,7 +57,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireAdminWrite(currentOrganization);
 
     const body = (await request.json().catch(() => ({}))) as {
       email?: unknown;

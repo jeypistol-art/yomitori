@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
-import { normalizeNullableText, requireMasterDataWrite } from "@/lib/master_data";
+import { normalizeNullableText } from "@/lib/master_data";
+import { requireOperationalWrite, requireTaskDelete } from "@/lib/permissions";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -69,7 +70,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireOperationalWrite(currentOrganization);
 
     const body = (await request.json().catch(() => ({}))) as {
       title?: unknown;
@@ -172,7 +173,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireTaskDelete(currentOrganization);
 
     const result = await query(
       `UPDATE tasks

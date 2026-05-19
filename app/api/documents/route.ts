@@ -7,13 +7,14 @@ import {
   assertCounterpartyBelongsToOrganization,
   assertManagedAssetBelongsToOrganization,
   normalizeNullableText,
-  requireMasterDataWrite,
 } from "@/lib/master_data";
+import { requireOperationalWrite } from "@/lib/permissions";
 import {
   getR2DocumentsBucket,
   uploadDocumentFileToR2,
   type PreparedDocumentFile,
 } from "@/lib/r2_documents";
+import { consumeDocumentUsage, getOrCreateCurrentUsagePeriod } from "@/lib/usage_limits";
 
 type DocumentRow = {
   id: string;
@@ -102,7 +103,8 @@ async function prepareFile(file: File): Promise<PreparedDocumentFile & { size: n
 export async function GET() {
   try {
     const { currentOrganization } = await requireApiContext();
-    const result = await query<DocumentRow>(
+    const [result, usage] = await Promise.all([
+      query<DocumentRow>(
       `SELECT
          d.id,
          d.title,
@@ -158,9 +160,14 @@ export async function GET() {
        ORDER BY d.created_at DESC
        LIMIT 100`,
       [currentOrganization.organization_id]
-    );
+      ),
+      getOrCreateCurrentUsagePeriod({
+        organizationId: currentOrganization.organization_id,
+        planCode: currentOrganization.plan_code,
+      }),
+    ]);
 
-    return NextResponse.json({ data: result.rows });
+    return NextResponse.json({ data: result.rows, usage });
   } catch (error) {
     return jsonApiError(error);
   }
@@ -171,7 +178,7 @@ export async function POST(request: Request) {
 
   try {
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireOperationalWrite(currentOrganization);
 
     const formData = await request.formData();
     const files = formData.getAll("files").filter(isUploadFile);
@@ -220,6 +227,13 @@ export async function POST(request: Request) {
       (sourceText ? inferTitleFromText(sourceText) : null) ??
       "無題の書類";
     const sourceType = files.length > 0 ? inferSourceType(files) : "email_paste";
+    const currentUsage = await getOrCreateCurrentUsagePeriod({
+      organizationId: currentOrganization.organization_id,
+      planCode: currentOrganization.plan_code,
+    });
+    if (currentUsage.remaining_count <= 0) {
+      throw new ApiError(402, "今月の書類登録上限に達しました");
+    }
 
     const document = await query<{ id: string }>(
       `INSERT INTO documents (
@@ -345,6 +359,12 @@ export async function POST(request: Request) {
        LIMIT 5`,
       [currentOrganization.organization_id, documentId]
     );
+    const usage = await consumeDocumentUsage({
+      organizationId: currentOrganization.organization_id,
+      planCode: currentOrganization.plan_code,
+      memberId: currentOrganization.member_id,
+      documentId,
+    });
 
     return NextResponse.json(
       {
@@ -355,6 +375,7 @@ export async function POST(request: Request) {
           file_count: storedFiles.length,
           files: storedFiles,
           duplicates: duplicates.rows,
+          usage,
         },
       },
       { status: 201 }

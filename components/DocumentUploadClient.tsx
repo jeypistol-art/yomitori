@@ -13,6 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import UsageSummaryClient from "@/components/UsageSummaryClient";
 
 type ManagedAsset = {
   id: string;
@@ -236,6 +237,8 @@ export default function DocumentUploadClient() {
         </div>
 
         <div className="space-y-5">
+          <UsageSummaryClient compact />
+
           <label className="block text-sm font-semibold">
             タイトル
             <input

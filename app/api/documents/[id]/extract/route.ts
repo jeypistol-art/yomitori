@@ -3,7 +3,7 @@ import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
 import { runDocumentAiExtraction } from "@/lib/document_ai_extraction";
-import { requireMasterDataWrite } from "@/lib/master_data";
+import { requireOperationalWrite } from "@/lib/permissions";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -13,7 +13,7 @@ export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireOperationalWrite(currentOrganization);
 
     const document = await query<{ id: string }>(
       `SELECT id

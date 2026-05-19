@@ -7,8 +7,8 @@ import {
   normalizeAssetType,
   normalizeNullableText,
   normalizeRequiredText,
-  requireMasterDataWrite,
 } from "@/lib/master_data";
+import { requireAdminWrite } from "@/lib/permissions";
 
 type ManagedAssetRow = {
   id: string;
@@ -60,7 +60,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireAdminWrite(currentOrganization);
 
     const body = await readJson(request);
     const parentId = normalizeNullableText(body.parent_id);

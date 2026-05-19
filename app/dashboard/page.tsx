@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Bell, CheckSquare, Database, FilePlus, Users } from "lucide-react";
+import { Bell, CheckSquare, Database, FilePlus, ShieldCheck, Users } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth_options";
+import UsageSummaryClient from "@/components/UsageSummaryClient";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -43,6 +44,13 @@ export default async function DashboardPage() {
               担当者設定
             </Link>
             <Link
+              href="/audit-logs"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              監査ログ
+            </Link>
+            <Link
               href="/master-data"
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
             >
@@ -59,6 +67,10 @@ export default async function DashboardPage() {
           </div>
         </header>
 
+        <div className="mb-4">
+          <UsageSummaryClient />
+        </div>
+
         <div className="grid gap-4 md:grid-cols-3">
           {[
             ["台帳設定", "管理対象と取引先", "/master-data"],
@@ -67,6 +79,7 @@ export default async function DashboardPage() {
             ["未処理一覧", "月次で残っている書類とタスク", "/unprocessed"],
             ["リマインド", "予定されている通知", "/reminders"],
             ["登録済み書類", "登録済み書類の一覧", "/documents/new"],
+            ["監査ログ", "承認・削除・通知の証跡", "/audit-logs"],
           ].map(([title, body, href]) => (
             <Link
               key={title}

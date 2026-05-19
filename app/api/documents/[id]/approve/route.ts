@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
-import { requireMasterDataWrite } from "@/lib/master_data";
+import { requireOperationalWrite } from "@/lib/permissions";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -167,7 +167,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireOperationalWrite(currentOrganization);
 
     const body = (await request.json().catch(() => ({}))) as {
       draft?: unknown;

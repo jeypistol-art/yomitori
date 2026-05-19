@@ -6,8 +6,8 @@ import {
   normalizeCounterpartyType,
   normalizeNullableText,
   normalizeRequiredText,
-  requireMasterDataWrite,
 } from "@/lib/master_data";
+import { requireAdminWrite } from "@/lib/permissions";
 
 type CounterpartyRow = {
   id: string;
@@ -61,7 +61,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireAdminWrite(currentOrganization);
 
     const body = await readJson(request);
     const result = await query<CounterpartyRow>(

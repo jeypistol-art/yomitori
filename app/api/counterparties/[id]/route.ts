@@ -6,8 +6,8 @@ import {
   normalizeCounterpartyType,
   normalizeNullableText,
   normalizeRequiredText,
-  requireMasterDataWrite,
 } from "@/lib/master_data";
+import { requireAdminWrite } from "@/lib/permissions";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireAdminWrite(currentOrganization);
 
     const body = await readJson(request);
     const result = await query<CounterpartyRow>(
@@ -93,7 +93,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
-    requireMasterDataWrite(currentOrganization);
+    requireAdminWrite(currentOrganization);
 
     const result = await query<{ id: string }>(
       `UPDATE counterparties
