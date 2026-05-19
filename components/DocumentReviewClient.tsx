@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -222,6 +223,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   const [isApproving, setIsApproving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [createdTasks, setCreatedTasks] = useState<Array<{ id: string; title: string }>>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -345,13 +347,15 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
     setIsApproving(true);
     setError("");
     setMessage("");
+    setCreatedTasks([]);
     try {
       const result = await fetchJson<
-        ApiItem<{ document: { status: string }; created_tasks: Array<{ id: string }> }>
+        ApiItem<{ document: { status: string }; created_tasks: Array<{ id: string; title: string }> }>
       >(`/api/documents/${documentId}/approve`, {
         method: "POST",
         body: JSON.stringify({ draft, create_tasks: true }),
       });
+      setCreatedTasks(result.data.created_tasks);
       setMessage(
         `承認しました。作成タスク: ${result.data.created_tasks.length}件`
       );
@@ -496,6 +500,34 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
           <p className="mt-3 border border-[#f1c9c3] bg-[#fff5f2] px-3 py-2 text-sm font-semibold text-[#9a3412]">
             {error}
           </p>
+        ) : null}
+        {createdTasks.length > 0 ? (
+          <div className="mt-3 border border-[#cde5d5] bg-[#f1faf4] px-3 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-bold text-[#24613f]">
+                作成されたタスクを確認できます
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/tasks?status=todo"
+                  className="h-9 rounded-md bg-[#2f5d50] px-3 py-2 text-sm font-bold text-white"
+                >
+                  タスク一覧へ
+                </Link>
+                <Link
+                  href="/unprocessed"
+                  className="h-9 rounded-md border border-[#cde5d5] bg-white px-3 py-2 text-sm font-bold text-[#24613f]"
+                >
+                  未処理一覧へ
+                </Link>
+              </div>
+            </div>
+            <ul className="mt-2 space-y-1 text-sm leading-6 text-[#24613f]">
+              {createdTasks.map((task) => (
+                <li key={task.id}>{task.title}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
       </section>
 
