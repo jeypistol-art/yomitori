@@ -10,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 type PendingDocument = {
@@ -192,6 +193,42 @@ export default function UnprocessedQueueClient() {
     }
   }
 
+  async function deleteDocument(document: PendingDocument) {
+    if (!window.confirm(`${document.suggested_title ?? document.title} を削除しますか。`)) {
+      return;
+    }
+    setWorkingId(document.id);
+    setMessage("");
+    setError("");
+    try {
+      await fetchJson(`/api/documents/${document.id}`, { method: "DELETE" });
+      setMessage(`${document.suggested_title ?? document.title} を削除しました`);
+      await loadQueue();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "書類削除に失敗しました");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  async function deleteTask(task: PendingTask) {
+    if (!window.confirm(`${task.title} を削除しますか。`)) {
+      return;
+    }
+    setWorkingId(task.id);
+    setMessage("");
+    setError("");
+    try {
+      await fetchJson(`/api/tasks/${task.id}`, { method: "DELETE" });
+      setMessage(`${task.title} を削除しました`);
+      await loadQueue();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "タスク削除に失敗しました");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
   const showDocuments = view === "all" || view === "documents";
   const showTasks = view === "all" || view === "tasks";
 
@@ -333,6 +370,15 @@ export default function UnprocessedQueueClient() {
                             AI抽出
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          disabled={workingId === document.id}
+                          onClick={() => void deleteDocument(document)}
+                          className="inline-flex h-9 items-center gap-2 rounded-md border border-[#f1c9c3] px-3 text-sm font-bold text-[#9a3412] disabled:opacity-60"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          削除
+                        </button>
                       </div>
                     </div>
                   ))
@@ -380,6 +426,11 @@ export default function UnprocessedQueueClient() {
                         ) : null}
                       </div>
                       <h3 className="mt-2 break-words text-base font-bold">{task.title}</h3>
+                      {task.document_title ? (
+                        <p className="mt-1 break-words text-xs font-semibold text-[#6b7280]">
+                          書類: {task.document_title}
+                        </p>
+                      ) : null}
                       {task.description ? (
                         <p className="mt-2 break-words text-sm leading-6 text-[#4b5563]">
                           {task.description}
@@ -395,7 +446,7 @@ export default function UnprocessedQueueClient() {
                             className="inline-flex items-center gap-1 text-[#2f5d50]"
                           >
                             <FileText className="h-3.5 w-3.5" />
-                            {task.document_title ?? "書類"}
+                            確認
                           </Link>
                         ) : null}
                       </div>
@@ -418,6 +469,15 @@ export default function UnprocessedQueueClient() {
                             <CheckCircle2 className="h-4 w-4" />
                           )}
                           完了
+                        </button>
+                        <button
+                          type="button"
+                          disabled={workingId === task.id}
+                          onClick={() => void deleteTask(task)}
+                          className="inline-flex h-9 items-center gap-2 rounded-md border border-[#f1c9c3] px-3 text-sm font-bold text-[#9a3412] disabled:opacity-60"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          削除
                         </button>
                       </div>
                     </div>

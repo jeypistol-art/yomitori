@@ -120,9 +120,9 @@ export default function ReminderListClient() {
     <div className="space-y-5">
       <section className="grid gap-3 md:grid-cols-3">
         {[
-          ["Total", counts.total],
-          ["Overdue", counts.overdue],
-          ["Today", counts.today],
+          ["全て", counts.total],
+          ["期限切れ", counts.overdue],
+          ["本日", counts.today],
         ].map(([label, value]) => (
           <div key={label} className="border border-[#d9ded3] bg-white p-4">
             <p className="text-xs font-bold text-[#5f6b5f]">{label}</p>
@@ -215,6 +215,11 @@ export default function ReminderListClient() {
                   <h3 className="mt-2 break-words text-base font-bold">
                     {reminder.task_title}
                   </h3>
+                  {reminder.document_title ? (
+                    <p className="mt-1 break-words text-xs font-semibold text-[#6b7280]">
+                      書類: {reminder.document_title}
+                    </p>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-[#6b7280]">
                     <span>
                       通知先:{" "}
@@ -229,7 +234,7 @@ export default function ReminderListClient() {
                         className="inline-flex items-center gap-1 text-[#2f5d50]"
                       >
                         <FileText className="h-3.5 w-3.5" />
-                        {reminder.document_title ?? "書類"}
+                        確認
                       </Link>
                     ) : null}
                   </div>

@@ -66,6 +66,7 @@ export default async function DashboardPage() {
             ["期限間近", "今週対応が必要なタスク", "/tasks?due=week"],
             ["未処理一覧", "月次で残っている書類とタスク", "/unprocessed"],
             ["リマインド", "予定されている通知", "/reminders"],
+            ["登録済み書類", "登録済み書類の一覧", "/documents/new"],
           ].map(([title, body, href]) => (
             <Link
               key={title}

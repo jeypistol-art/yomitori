@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
-import { requireMasterDataWrite } from "@/lib/master_data";
+import {
+  assertManagedAssetBelongsToOrganization,
+  requireMasterDataWrite,
+} from "@/lib/master_data";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -10,6 +13,20 @@ type RouteContext = {
 
 function jsonString(value: unknown) {
   return JSON.stringify(value ?? {});
+}
+
+function normalizeIdList(value: unknown) {
+  if (!Array.isArray(value)) {
+    throw new ApiError(400, "managed_asset_ids must be an array");
+  }
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 export async function GET(_request: Request, context: RouteContext) {
@@ -197,8 +214,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { currentOrganization } = await requireApiContext();
     requireMasterDataWrite(currentOrganization);
 
-    const body = (await request.json().catch(() => ({}))) as { draft?: unknown };
-    if (!body.draft || typeof body.draft !== "object") {
+    const body = (await request.json().catch(() => ({}))) as {
+      draft?: unknown;
+      managed_asset_ids?: unknown;
+    };
+    const hasDraft = "draft" in body;
+    const hasManagedAssetIds = "managed_asset_ids" in body;
+    if (!hasDraft && !hasManagedAssetIds) {
+      throw new ApiError(400, "draft or managed_asset_ids is required");
+    }
+    if (hasDraft && (!body.draft || typeof body.draft !== "object")) {
       throw new ApiError(400, "draft is required");
     }
 
@@ -215,29 +240,64 @@ export async function PATCH(request: Request, context: RouteContext) {
       throw new ApiError(404, "document not found");
     }
 
-    const result = await query(
-      `INSERT INTO review_drafts (
-         organization_id,
-         document_id,
-         edited_by_member_id,
-         draft_json,
-         version
-       )
-       VALUES ($1, $2, $3, $4::jsonb, 1)
-       ON CONFLICT (document_id)
-       DO UPDATE SET
-         edited_by_member_id = EXCLUDED.edited_by_member_id,
-         draft_json = EXCLUDED.draft_json,
-         version = review_drafts.version + 1,
-         updated_at = now()
-       RETURNING id, draft_json, version, updated_at`,
-      [
-        currentOrganization.organization_id,
-        id,
-        currentOrganization.member_id,
-        jsonString(body.draft),
-      ]
-    );
+    const result = hasDraft
+      ? await query(
+          `INSERT INTO review_drafts (
+             organization_id,
+             document_id,
+             edited_by_member_id,
+             draft_json,
+             version
+           )
+           VALUES ($1, $2, $3, $4::jsonb, 1)
+           ON CONFLICT (document_id)
+           DO UPDATE SET
+             edited_by_member_id = EXCLUDED.edited_by_member_id,
+             draft_json = EXCLUDED.draft_json,
+             version = review_drafts.version + 1,
+             updated_at = now()
+           RETURNING id, draft_json, version, updated_at`,
+          [
+            currentOrganization.organization_id,
+            id,
+            currentOrganization.member_id,
+            jsonString(body.draft),
+          ]
+        )
+      : null;
+
+    let managedAssetIds: string[] | null = null;
+    if (hasManagedAssetIds) {
+      managedAssetIds = normalizeIdList(body.managed_asset_ids);
+      for (const managedAssetId of managedAssetIds) {
+        const exists = await assertManagedAssetBelongsToOrganization(
+          currentOrganization.organization_id,
+          managedAssetId
+        );
+        if (!exists) {
+          throw new ApiError(400, "managed_asset_ids contains invalid id");
+        }
+      }
+
+      await query(
+        `DELETE FROM document_assets
+         WHERE organization_id = $1
+           AND document_id = $2`,
+        [currentOrganization.organization_id, id]
+      );
+      for (const managedAssetId of managedAssetIds) {
+        await query(
+          `INSERT INTO document_assets (
+             organization_id,
+             document_id,
+             managed_asset_id
+           )
+           VALUES ($1, $2, $3)
+           ON CONFLICT DO NOTHING`,
+          [currentOrganization.organization_id, id, managedAssetId]
+        );
+      }
+    }
 
     await query(
       `INSERT INTO audit_logs (
@@ -253,11 +313,19 @@ export async function PATCH(request: Request, context: RouteContext) {
         currentOrganization.organization_id,
         currentOrganization.member_id,
         id,
-        jsonString({ draft_version: result.rows[0]?.version }),
+        jsonString({
+          draft_version: result?.rows[0]?.version ?? null,
+          managed_asset_count: managedAssetIds?.length ?? null,
+        }),
       ]
     );
 
-    return NextResponse.json({ data: result.rows[0] });
+    return NextResponse.json({
+      data: {
+        review_draft: result?.rows[0] ?? null,
+        managed_asset_ids: managedAssetIds,
+      },
+    });
   } catch (error) {
     return jsonApiError(error);
   }

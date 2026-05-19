@@ -29,6 +29,12 @@ type Member = {
   email: string;
 };
 
+type ManagedAsset = {
+  id: string;
+  asset_type: string;
+  name: string;
+};
+
 type ReviewPayload = {
   document: {
     id: string;
@@ -46,6 +52,7 @@ type ReviewPayload = {
   };
   files: ReviewFile[];
   assets: Array<{ id: string; name: string; asset_type: string }>;
+  managed_assets: ManagedAsset[];
   latest_extraction: {
     id: string;
     status: string;
@@ -83,6 +90,15 @@ const priorityLabels: Record<string, string> = {
   normal: "通常",
   high: "高",
   urgent: "至急",
+};
+
+const assetTypeLabels: Record<string, string> = {
+  property: "物件",
+  facility: "施設",
+  store: "店舗",
+  tenant: "テナント",
+  office: "事務所",
+  other: "その他",
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -124,6 +140,33 @@ function splitLines(value: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function noticeText(value: unknown) {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (isRecord(parsed)) {
+        return noticeText(parsed);
+      }
+    } catch {
+      return value;
+    }
+    return value;
+  }
+  return (
+    firstString(asRecord(value), [
+      "message",
+      "warning",
+      "text",
+      "description",
+      "note",
+      "content",
+      "risk",
+      "注意",
+      "理由",
+    ]) || JSON.stringify(value)
+  );
 }
 
 function buildInitialDraft(payload: ReviewPayload): JsonRecord {
@@ -224,6 +267,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [createdTasks, setCreatedTasks] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -236,6 +280,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
       );
       setPayload(result.data);
       setDraft(buildInitialDraft(result.data));
+      setSelectedAssetIds(result.data.assets.map((asset) => asset.id));
       setSelectedFileId(result.data.files[0]?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
@@ -266,18 +311,8 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
     : asArray(draft.required_actions);
   const risks = asArray(draft.risks_and_notes);
   const warnings = [
-    ...asUnknownArray(draft.warnings).map((item) =>
-      typeof item === "string"
-        ? item
-        : firstString(asRecord(item), ["message", "text", "description"]) || JSON.stringify(item)
-    ),
-    ...asUnknownArray(draft.missing_information).map(
-      (item) =>
-        typeof item === "string"
-          ? item
-          : firstString(asRecord(item), ["message", "text", "description"]) ||
-            JSON.stringify(item)
-    ),
+    ...asUnknownArray(draft.warnings).map(noticeText),
+    ...asUnknownArray(draft.missing_information).map(noticeText),
   ].filter(Boolean);
 
   function updateSummary(key: string, value: unknown) {
@@ -323,6 +358,32 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
         },
       ],
     }));
+  }
+
+  function toggleAsset(id: string) {
+    setSelectedAssetIds((current) =>
+      current.includes(id)
+        ? current.filter((currentId) => currentId !== id)
+        : [...current, id]
+    );
+  }
+
+  async function saveManagedAssets() {
+    setIsSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await fetchJson(`/api/documents/${documentId}/review`, {
+        method: "PATCH",
+        body: JSON.stringify({ managed_asset_ids: selectedAssetIds }),
+      });
+      setMessage("管理対象を保存しました");
+      await loadReview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "管理対象の保存に失敗しました");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function saveDraft() {
@@ -693,6 +754,57 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
           </div>
 
           <div className="border border-[#d9ded3] bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-base font-bold">管理対象</h3>
+              <button
+                type="button"
+                onClick={() => void saveManagedAssets()}
+                disabled={isSaving}
+                className="rounded-md border border-[#d9ded3] px-3 py-2 text-sm font-bold text-[#2f5d50] disabled:opacity-60"
+              >
+                保存
+              </button>
+            </div>
+            <div className="mt-3">
+              {payload.managed_assets.length === 0 ? (
+                <div className="border border-dashed border-[#cfd6ca] px-3 py-5 text-center text-sm text-[#5f6b5f]">
+                  管理対象は未登録です
+                </div>
+              ) : (
+                <div className="max-h-44 space-y-2 overflow-auto border border-[#e1e6dc] p-2">
+                  {payload.managed_assets.map((asset) => (
+                    <label
+                      key={asset.id}
+                      className="flex cursor-pointer items-start gap-3 rounded px-2 py-2 hover:bg-[#f7f8f5]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAssetIds.includes(asset.id)}
+                        onChange={() => toggleAsset(asset.id)}
+                        className="mt-1 h-4 w-4"
+                      />
+                      <span className="min-w-0">
+                        <span className="block break-words text-sm font-bold">
+                          {asset.name}
+                        </span>
+                        <span className="mt-1 block text-xs text-[#6b7280]">
+                          {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <Link
+                href="/master-data"
+                className="mt-2 inline-flex text-xs font-bold text-[#2f5d50]"
+              >
+                台帳設定へ
+              </Link>
+            </div>
+          </div>
+
+          <div className="border border-[#d9ded3] bg-white p-4">
             <h3 className="text-base font-bold">期限</h3>
             <div className="mt-3 space-y-3">
               {importantDates.length === 0 ? (
@@ -894,7 +1006,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                         </select>
                       </label>
                       <label className="block">
-                        <span className="flex items-center justify-between gap-2 text-xs font-bold text-[#4b5563]">
+                        <span className="flex h-4 items-center justify-between gap-2 text-xs font-bold leading-4 text-[#4b5563]">
                           担当者
                           <a href="/team" className="text-[#2f5d50]">
                             担当者設定
