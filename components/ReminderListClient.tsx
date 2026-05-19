@@ -18,6 +18,8 @@ type ReminderItem = {
   channel: string;
   remind_at: string;
   status: string;
+  sent_at: string | null;
+  error_message: string | null;
   created_at: string;
 };
 
@@ -37,6 +39,12 @@ const timingLabels: Record<string, string> = {
   overdue: "未通知の過去分",
   today: "今日",
   week: "7日以内",
+};
+
+const channelLabels: Record<string, string> = {
+  email: "メール",
+  in_app: "画面内",
+  google_calendar: "Googleカレンダー",
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -209,8 +217,13 @@ export default function ReminderListClient() {
                       {formatDateTime(reminder.remind_at)}
                     </span>
                     <span className="text-xs font-semibold text-[#6b7280]">
-                      {reminder.channel}
+                      {channelLabels[reminder.channel] ?? reminder.channel}
                     </span>
+                    {reminder.sent_at ? (
+                      <span className="text-xs font-semibold text-[#6b7280]">
+                        送信 {formatDateTime(reminder.sent_at)}
+                      </span>
+                    ) : null}
                   </div>
                   <h3 className="mt-2 break-words text-base font-bold">
                     {reminder.task_title}
@@ -238,6 +251,11 @@ export default function ReminderListClient() {
                       </Link>
                     ) : null}
                   </div>
+                  {reminder.error_message ? (
+                    <p className="mt-2 break-words text-xs font-semibold text-[#9a3412]">
+                      エラー: {reminder.error_message}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>

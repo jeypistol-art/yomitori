@@ -17,6 +17,8 @@ type ReminderRow = {
   channel: string;
   remind_at: string;
   status: string;
+  sent_at: string | null;
+  error_message: string | null;
   created_at: string;
 };
 
@@ -60,6 +62,8 @@ export async function GET(request: Request) {
          r.channel::text AS channel,
          r.remind_at::text AS remind_at,
          r.status::text AS status,
+         r.sent_at::text AS sent_at,
+         r.error_message,
          r.created_at
        FROM reminders r
        JOIN tasks t

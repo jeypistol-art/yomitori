@@ -27,8 +27,19 @@ npm run dev
 - `lib/openai_client.ts`
 - `lib/r2_documents.ts`
 - `lib/auth_options.ts`
+- `lib/email_delivery.ts`
+- `lib/reminder_dispatcher.ts`
+
+## Reminder email job
+
+Scheduled reminders are processed by:
+
+```powershell
+Invoke-WebRequest -Method POST -Uri "http://localhost:3100/api/jobs/send-reminders" -Headers @{ Authorization = "Bearer $env:NOTIFICATION_JOB_SECRET" }
+```
+
+Set `EMAIL_FROM` and either `RESEND_API_KEY` or SMTP settings. Use `EMAIL_DELIVERY_MODE=log` for local dry runs.
 
 ## Notes
 
 This project starts from a clean YOMITORI-specific scaffold and reuses only the generic TENsNAP infrastructure patterns.
-

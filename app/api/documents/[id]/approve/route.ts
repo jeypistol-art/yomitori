@@ -333,7 +333,7 @@ export async function POST(request: Request, context: RouteContext) {
                  remind_at,
                  status
                )
-               VALUES ($1, $2, $3, 'in_app', $4, 'scheduled')`,
+               VALUES ($1, $2, $3, 'email', $4, 'scheduled')`,
               [
                 currentOrganization.organization_id,
                 taskRow.id,

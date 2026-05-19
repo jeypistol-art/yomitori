@@ -150,6 +150,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       ]
     );
 
+    if (status && ["done", "unnecessary", "canceled"].includes(status)) {
+      await query(
+        `UPDATE reminders
+         SET status = 'canceled',
+             updated_at = now()
+         WHERE organization_id = $1
+           AND task_id = $2
+           AND status = 'scheduled'`,
+        [currentOrganization.organization_id, id]
+      );
+    }
+
     return NextResponse.json({ data: result.rows[0] });
   } catch (error) {
     return jsonApiError(error);
