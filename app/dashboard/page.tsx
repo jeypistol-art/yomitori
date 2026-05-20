@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { Bell, CheckSquare, Database, FilePlus, ShieldCheck, Users } from "lucide-react";
+import {
+  Bell,
+  CheckSquare,
+  CreditCard,
+  Database,
+  FilePlus,
+  Settings,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth_options";
@@ -23,6 +32,13 @@ export default async function DashboardPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link
+              href="/setup"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
+            >
+              <Settings className="h-4 w-4" />
+              初期設定
+            </Link>
+            <Link
               href="/unprocessed"
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
             >
@@ -35,6 +51,13 @@ export default async function DashboardPage() {
             >
               <Bell className="h-4 w-4" />
               リマインド
+            </Link>
+            <Link
+              href="/usage"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
+            >
+              <CreditCard className="h-4 w-4" />
+              利用状況
             </Link>
             <Link
               href="/team"
@@ -73,12 +96,14 @@ export default async function DashboardPage() {
 
         <div className="grid gap-4 md:grid-cols-3">
           {[
+            ["初期設定", "管理対象・担当者・通知設定の準備", "/setup"],
             ["台帳設定", "管理対象と取引先", "/master-data"],
             ["承認待ち", "AI抽出後、人間の確認が必要な書類", "/unprocessed"],
             ["期限間近", "今週対応が必要なタスク", "/tasks?due=week"],
             ["未処理一覧", "月次で残っている書類とタスク", "/unprocessed"],
             ["リマインド", "予定されている通知", "/reminders"],
             ["登録済み書類", "登録済み書類の一覧", "/documents/new"],
+            ["利用状況", "月次上限・追加パック・プラン", "/usage"],
             ["監査ログ", "承認・削除・通知の証跡", "/audit-logs"],
           ].map(([title, body, href]) => (
             <Link

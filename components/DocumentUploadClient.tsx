@@ -56,6 +56,15 @@ type UploadResponse = {
   };
 };
 
+class ClientApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 const assetTypeLabels: Record<string, string> = {
   property: "物件",
   facility: "施設",
@@ -80,7 +89,8 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
+    throw new ClientApiError(
+      response.status,
       typeof payload.error === "string" ? payload.error : "Request failed"
     );
   }
@@ -108,6 +118,7 @@ export default function DocumentUploadClient() {
   const [extractingDocumentId, setExtractingDocumentId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isLimitError, setIsLimitError] = useState(false);
 
   const selectedFileSize = useMemo(
     () => files.reduce((total, file) => total + file.size, 0),
@@ -117,6 +128,7 @@ export default function DocumentUploadClient() {
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setError("");
+    setIsLimitError(false);
     try {
       const [assetPayload, counterpartyPayload, documentPayload] =
         await Promise.all([
@@ -156,6 +168,7 @@ export default function DocumentUploadClient() {
 
   async function uploadDocument() {
     setError("");
+    setIsLimitError(false);
     setMessage("");
     if (files.length === 0 && sourceText.trim().length === 0) {
       setError("ファイルを選択するか、メール本文・通知文を貼り付けてください");
@@ -188,6 +201,7 @@ export default function DocumentUploadClient() {
       setSourceText("");
       await loadAll();
     } catch (err) {
+      setIsLimitError(err instanceof ClientApiError && err.status === 402);
       setError(err instanceof Error ? err.message : "アップロードに失敗しました");
     } finally {
       setIsUploading(false);
@@ -197,6 +211,7 @@ export default function DocumentUploadClient() {
   async function extractDocument(document: DocumentItem) {
     setExtractingDocumentId(document.id);
     setError("");
+    setIsLimitError(false);
     setMessage("");
     try {
       await fetchJson(`/api/documents/${document.id}/extract`, {
@@ -216,6 +231,7 @@ export default function DocumentUploadClient() {
       return;
     }
     setError("");
+    setIsLimitError(false);
     setMessage("");
     try {
       await fetchJson(`/api/documents/${document.id}`, { method: "DELETE" });
@@ -386,7 +402,15 @@ export default function DocumentUploadClient() {
           ) : null}
           {error ? (
             <div className="border border-[#f1c9c3] bg-[#fff5f2] px-4 py-3 text-sm font-semibold text-[#9a3412]">
-              {error}
+              <p>{error}</p>
+              {isLimitError ? (
+                <Link
+                  href="/usage"
+                  className="mt-3 inline-flex h-9 items-center rounded-md border border-[#f1c9c3] bg-white px-3 text-xs font-bold text-[#9a3412]"
+                >
+                  利用状況・追加パックを確認
+                </Link>
+              ) : null}
             </div>
           ) : null}
 

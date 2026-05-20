@@ -11,7 +11,7 @@ export type SendEmailResult = {
   messageId: string | null;
 };
 
-function getDeliveryMode() {
+export function getDeliveryMode() {
   const mode = process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase();
   if (mode === "log" || mode === "send") {
     return mode;
@@ -42,6 +42,30 @@ function hasSmtpConfig() {
       process.env.EMAIL_SERVER_USER?.trim() &&
       process.env.EMAIL_SERVER_PASSWORD?.trim()
   );
+}
+
+export function getEmailDeliveryStatus() {
+  const mode = getDeliveryMode();
+  const resendConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
+  const smtpConfigured = hasSmtpConfig();
+  const from = getEmailFrom();
+  const provider =
+    mode === "log"
+      ? "log"
+      : resendConfigured
+        ? "resend"
+        : smtpConfigured
+          ? "smtp"
+          : "unconfigured";
+
+  return {
+    mode,
+    provider,
+    from,
+    from_configured: Boolean(process.env.EMAIL_FROM?.trim()),
+    resend_configured: resendConfigured,
+    smtp_configured: smtpConfigured,
+  };
 }
 
 async function sendWithResend(args: SendEmailArgs): Promise<SendEmailResult> {

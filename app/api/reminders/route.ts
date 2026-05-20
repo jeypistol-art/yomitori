@@ -19,6 +19,9 @@ type ReminderRow = {
   status: string;
   sent_at: string | null;
   error_message: string | null;
+  delivery_provider: string | null;
+  delivery_message_id: string | null;
+  delivery_logged_at: string | null;
   created_at: string;
 };
 
@@ -64,6 +67,9 @@ export async function GET(request: Request) {
          r.status::text AS status,
          r.sent_at::text AS sent_at,
          r.error_message,
+         delivery.provider AS delivery_provider,
+         delivery.message_id AS delivery_message_id,
+         delivery.created_at::text AS delivery_logged_at,
          r.created_at
        FROM reminders r
        JOIN tasks t
@@ -81,6 +87,19 @@ export async function GET(request: Request) {
        JOIN users u
          ON u.id = om.user_id
         AND u.deleted_at IS NULL
+       LEFT JOIN LATERAL (
+         SELECT
+           al.after_json ->> 'provider' AS provider,
+           al.after_json ->> 'message_id' AS message_id,
+           al.created_at
+         FROM audit_logs al
+         WHERE al.organization_id = r.organization_id
+           AND al.target_type = 'reminder'
+           AND al.target_id = r.id
+           AND al.action = 'reminder.sent'
+         ORDER BY al.created_at DESC
+         LIMIT 1
+       ) delivery ON true
        WHERE ${where.join(" AND ")}
        ORDER BY r.remind_at ASC, r.created_at DESC
        LIMIT 200`,

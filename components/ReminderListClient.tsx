@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, FileText, RefreshCw } from "lucide-react";
+import { AlertTriangle, CalendarClock, FileText, Loader2, RefreshCw, Send } from "lucide-react";
 
 type ReminderItem = {
   id: string;
@@ -20,7 +20,19 @@ type ReminderItem = {
   status: string;
   sent_at: string | null;
   error_message: string | null;
+  delivery_provider: string | null;
+  delivery_message_id: string | null;
+  delivery_logged_at: string | null;
   created_at: string;
+};
+
+type DeliveryStatus = {
+  mode: string;
+  provider: string;
+  from: string;
+  from_configured: boolean;
+  resend_configured: boolean;
+  smtp_configured: boolean;
 };
 
 type ApiList<T> = {
@@ -47,8 +59,16 @@ const channelLabels: Record<string, string> = {
   google_calendar: "Googleカレンダー",
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+const providerLabels: Record<string, string> = {
+  resend: "Resend",
+  smtp: "SMTP",
+  log: "ログ出力",
+  in_app: "画面内",
+  unconfigured: "未設定",
+};
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(
@@ -80,23 +100,31 @@ function getReminderTone(value: string) {
 
 export default function ReminderListClient() {
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus | null>(null);
   const [statusFilter, setStatusFilter] = useState("scheduled");
   const [timingFilter, setTimingFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const loadReminders = useCallback(async () => {
+  const loadReminders = useCallback(async (clearFeedback = true) => {
     setIsLoading(true);
     setError("");
+    if (clearFeedback) {
+      setMessage("");
+    }
     try {
       const params = new URLSearchParams({
         status: statusFilter,
         timing: timingFilter,
       });
-      const payload = await fetchJson<ApiList<ReminderItem>>(
-        `/api/reminders?${params.toString()}`
-      );
+      const [payload, deliveryPayload] = await Promise.all([
+        fetchJson<ApiList<ReminderItem>>(`/api/reminders?${params.toString()}`),
+        fetchJson<{ data: DeliveryStatus }>("/api/reminders/delivery-status"),
+      ]);
       setReminders(payload.data);
+      setDeliveryStatus(deliveryPayload.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
@@ -107,6 +135,31 @@ export default function ReminderListClient() {
   useEffect(() => {
     void loadReminders();
   }, [loadReminders]);
+
+  async function resendReminder(reminder: ReminderItem) {
+    setResendingId(reminder.id);
+    setError("");
+    setMessage("");
+    try {
+      const payload = await fetchJson<{
+        data: { sent: number; failed: number; canceled_completed: number };
+      }>(`/api/reminders/${reminder.id}/resend`, { method: "POST" });
+      if (payload.data.sent > 0) {
+        setMessage(`${reminder.task_title} のリマインドを再送しました`);
+      } else if (payload.data.failed > 0) {
+        setError(`${reminder.task_title} の再送に失敗しました`);
+      } else if (payload.data.canceled_completed > 0) {
+        setMessage(`${reminder.task_title} は完了済みのためキャンセルしました`);
+      } else {
+        setError("再送対象のリマインドが見つかりませんでした");
+      }
+      await loadReminders(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "再送に失敗しました");
+    } finally {
+      setResendingId(null);
+    }
+  }
 
   const counts = useMemo(() => {
     const now = new Date();
@@ -137,6 +190,46 @@ export default function ReminderListClient() {
             <p className="mt-2 text-2xl font-bold">{value}</p>
           </div>
         ))}
+      </section>
+
+      <section className="border border-[#d9ded3] bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f5d50]">
+              Delivery
+            </p>
+            <h2 className="mt-1 text-lg font-bold">通知送信基盤</h2>
+            <p className="mt-2 text-sm font-semibold text-[#4b5563]">
+              {deliveryStatus
+                ? `${providerLabels[deliveryStatus.provider] ?? deliveryStatus.provider} / ${deliveryStatus.from}`
+                : "確認中"}
+            </p>
+          </div>
+          {deliveryStatus ? (
+            <div className="flex flex-wrap gap-2 text-xs font-bold">
+              <span className="rounded bg-[#edf2e8] px-2 py-1 text-[#2f5d50]">
+                mode: {deliveryStatus.mode}
+              </span>
+              <span
+                className={
+                  deliveryStatus.provider === "resend"
+                    ? "rounded bg-[#edf2e8] px-2 py-1 text-[#2f5d50]"
+                    : "rounded bg-[#fff8eb] px-2 py-1 text-[#9a5b13]"
+                }
+              >
+                provider: {providerLabels[deliveryStatus.provider] ?? deliveryStatus.provider}
+              </span>
+            </div>
+          ) : null}
+        </div>
+        {deliveryStatus && deliveryStatus.provider !== "resend" ? (
+          <div className="mt-3 flex items-start gap-2 border border-[#f0d6a8] bg-[#fff8eb] px-4 py-3 text-sm font-semibold text-[#9a5b13]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              本番送信はResend推奨です。Cloudflare導入後に RESEND_API_KEY と EMAIL_FROM を設定してください。
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <section className="border border-[#d9ded3] bg-white p-4">
@@ -184,6 +277,11 @@ export default function ReminderListClient() {
         {error ? (
           <p className="mt-3 border border-[#f1c9c3] bg-[#fff5f2] px-4 py-3 text-sm font-semibold text-[#9a3412]">
             {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p className="mt-3 border border-[#cde5d5] bg-[#f1faf4] px-4 py-3 text-sm font-semibold text-[#24613f]">
+            {message}
           </p>
         ) : null}
       </section>
@@ -250,11 +348,36 @@ export default function ReminderListClient() {
                         確認
                       </Link>
                     ) : null}
+                    {reminder.delivery_provider ? (
+                      <span>
+                        送信基盤:{" "}
+                        {providerLabels[reminder.delivery_provider] ??
+                          reminder.delivery_provider}
+                      </span>
+                    ) : null}
+                    {reminder.delivery_message_id ? (
+                      <span>送信ID: {reminder.delivery_message_id}</span>
+                    ) : null}
                   </div>
                   {reminder.error_message ? (
-                    <p className="mt-2 break-words text-xs font-semibold text-[#9a3412]">
-                      エラー: {reminder.error_message}
-                    </p>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-[#f1c9c3] bg-[#fff5f2] px-3 py-2">
+                      <p className="break-words text-xs font-semibold text-[#9a3412]">
+                        エラー: {reminder.error_message}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void resendReminder(reminder)}
+                        disabled={resendingId === reminder.id}
+                        className="inline-flex h-8 shrink-0 items-center gap-2 rounded-md border border-[#f1c9c3] bg-white px-3 text-xs font-bold text-[#9a3412] disabled:opacity-60"
+                      >
+                        {resendingId === reminder.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        再送
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               ))}

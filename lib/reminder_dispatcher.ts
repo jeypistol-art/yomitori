@@ -24,6 +24,7 @@ type ProcessedReminder = {
   status: "sent" | "failed";
   channel: string;
   provider: string | null;
+  message_id: string | null;
   error: string | null;
 };
 
@@ -153,8 +154,21 @@ async function createNotification(reminder: DueReminderRow) {
   );
 }
 
-export async function processDueReminders(args: { limit?: number } = {}) {
+export async function processDueReminders(
+  args: { limit?: number; organizationId?: string; reminderId?: string } = {}
+) {
+  const { organizationId, reminderId } = args;
   const limit = parseBatchSize(args.limit ?? process.env.NOTIFICATION_JOB_BATCH_SIZE);
+  const cancelParams: unknown[] = [];
+  const cancelFilters: string[] = [];
+  if (organizationId) {
+    cancelParams.push(organizationId);
+    cancelFilters.push(`AND r.organization_id = $${cancelParams.length}`);
+  }
+  if (reminderId) {
+    cancelParams.push(reminderId);
+    cancelFilters.push(`AND r.id = $${cancelParams.length}`);
+  }
 
   const canceledCompleted = await query<{ id: string }>(
     `UPDATE reminders r
@@ -165,8 +179,25 @@ export async function processDueReminders(args: { limit?: number } = {}) {
        AND t.id = r.task_id
        AND r.status = 'scheduled'
        AND t.status IN ('done', 'unnecessary', 'canceled')
-     RETURNING r.id`
+       ${cancelFilters.join("\n       ")}
+     RETURNING r.id`,
+    cancelParams
   );
+
+  const where = [
+    "r.status = 'scheduled'",
+    "r.remind_at <= now()",
+  ];
+  const params: unknown[] = [];
+  if (organizationId) {
+    params.push(organizationId);
+    where.push(`r.organization_id = $${params.length}`);
+  }
+  if (reminderId) {
+    params.push(reminderId);
+    where.push(`r.id = $${params.length}`);
+  }
+  params.push(limit);
 
   const due = await query<DueReminderRow>(
     `SELECT
@@ -205,11 +236,10 @@ export async function processDueReminders(args: { limit?: number } = {}) {
      JOIN users u
        ON u.id = om.user_id
       AND u.deleted_at IS NULL
-     WHERE r.status = 'scheduled'
-       AND r.remind_at <= now()
+     WHERE ${where.join("\n       AND ")}
      ORDER BY r.remind_at ASC
-     LIMIT $1`,
-    [limit]
+     LIMIT $${params.length}`,
+    params
   );
 
   const processed: ProcessedReminder[] = [];
@@ -217,6 +247,7 @@ export async function processDueReminders(args: { limit?: number } = {}) {
   for (const reminder of due.rows) {
     try {
       let provider: string | null = "in_app";
+      let messageId: string | null = null;
       if (reminder.channel === "email") {
         if (!reminder.recipient_email) {
           throw new Error("recipient email is missing");
@@ -229,6 +260,7 @@ export async function processDueReminders(args: { limit?: number } = {}) {
           html: email.html,
         });
         provider = result.provider;
+        messageId = result.messageId;
       }
 
       await createNotification(reminder);
@@ -260,6 +292,7 @@ export async function processDueReminders(args: { limit?: number } = {}) {
             task_id: reminder.task_id,
             channel: reminder.channel,
             provider,
+            message_id: messageId,
           }),
         ]
       );
@@ -268,6 +301,7 @@ export async function processDueReminders(args: { limit?: number } = {}) {
         status: "sent",
         channel: reminder.channel,
         provider,
+        message_id: messageId,
         error: null,
       });
     } catch (error) {
@@ -277,6 +311,7 @@ export async function processDueReminders(args: { limit?: number } = {}) {
         status: "failed",
         channel: reminder.channel,
         provider: null,
+        message_id: null,
         error: errorMessage,
       });
     }

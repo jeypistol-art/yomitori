@@ -1,5 +1,6 @@
 import { ApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { getPlanIncludedCount } from "@/lib/usage_catalog";
 
 export type UsageSummary = {
   id: string;
@@ -11,17 +12,6 @@ export type UsageSummary = {
   used_count: number;
   remaining_count: number;
 };
-
-const PLAN_INCLUDED_COUNTS: Record<string, number> = {
-  personal: 50,
-  business: 300,
-  pro: 500,
-  enterprise: 1000,
-};
-
-function getIncludedCount(planCode: string) {
-  return PLAN_INCLUDED_COUNTS[planCode] ?? PLAN_INCLUDED_COUNTS.personal;
-}
 
 function formatDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -57,7 +47,7 @@ export async function getOrCreateCurrentUsagePeriod(args: {
   planCode: string;
 }) {
   const { periodStart, periodEnd } = getCurrentTokyoMonthBounds();
-  const includedCount = getIncludedCount(args.planCode);
+  const includedCount = getPlanIncludedCount(args.planCode);
   const result = await query<UsageSummary>(
     `INSERT INTO usage_periods (
        organization_id,

@@ -56,6 +56,7 @@ const actionLabels: Record<string, string> = {
   "document.deleted": "書類削除",
   "review_draft.saved": "下書き保存",
   "reminder.sent": "リマインド送信",
+  "reminder.retry_requested": "リマインド再送",
 };
 
 const targetTypeLabels: Record<string, string> = {
@@ -235,6 +236,18 @@ function buildAuditView(log: AuditLog): AuditView {
 
     return {
       summary: `「${titleOf(log)}」のリマインドを送信しました。`,
+      details,
+    };
+  }
+
+  if (log.action === "reminder.retry_requested") {
+    const details: AuditDetail[] = [];
+    addDetail(details, "リマインドID", log.target_id);
+    addDetail(details, "変更前ステータス", before.status);
+    addDetail(details, "変更後ステータス", after.status);
+
+    return {
+      summary: `「${titleOf(log)}」のリマインド再送を実行しました。`,
       details,
     };
   }
