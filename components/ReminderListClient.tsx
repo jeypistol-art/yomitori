@@ -98,11 +98,19 @@ function getReminderTone(value: string) {
   return diffDays <= 7 ? "text-[#9a5b13]" : "text-[#2f5d50]";
 }
 
-export default function ReminderListClient() {
+type ReminderListClientProps = {
+  initialStatusFilter?: string;
+  initialTimingFilter?: string;
+};
+
+export default function ReminderListClient({
+  initialStatusFilter = "scheduled",
+  initialTimingFilter = "all",
+}: ReminderListClientProps) {
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus | null>(null);
-  const [statusFilter, setStatusFilter] = useState("scheduled");
-  const [timingFilter, setTimingFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [timingFilter, setTimingFilter] = useState(initialTimingFilter);
   const [isLoading, setIsLoading] = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");

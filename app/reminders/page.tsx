@@ -11,7 +11,21 @@ export const metadata: Metadata = {
   title: "リマインド",
 };
 
-export default async function RemindersPage() {
+type RemindersPageProps = {
+  searchParams: Promise<{
+    status?: string;
+    timing?: string;
+  }>;
+};
+
+const allowedStatusFilters = new Set(["all", "scheduled", "sent", "canceled", "failed"]);
+const allowedTimingFilters = new Set(["all", "overdue", "today", "week"]);
+
+function normalizeFilter(value: string | undefined, allowed: Set<string>, fallback: string) {
+  return value && allowed.has(value) ? value : fallback;
+}
+
+export default async function RemindersPage({ searchParams }: RemindersPageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     redirect("/login");
@@ -21,6 +35,18 @@ export default async function RemindersPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+
+  const resolvedSearchParams = await searchParams;
+  const initialStatusFilter = normalizeFilter(
+    resolvedSearchParams.status,
+    allowedStatusFilters,
+    "scheduled"
+  );
+  const initialTimingFilter = normalizeFilter(
+    resolvedSearchParams.timing,
+    allowedTimingFilters,
+    "all"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -45,7 +71,10 @@ export default async function RemindersPage() {
           </div>
         </header>
 
-        <ReminderListClient />
+        <ReminderListClient
+          initialStatusFilter={initialStatusFilter}
+          initialTimingFilter={initialTimingFilter}
+        />
       </div>
     </main>
   );

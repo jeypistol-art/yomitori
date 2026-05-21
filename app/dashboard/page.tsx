@@ -12,6 +12,7 @@ import {
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth_options";
+import DashboardFocusClient from "@/components/DashboardFocusClient";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 
 export default async function DashboardPage() {
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-6 py-8 text-[#1f2933]">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <header className="mb-8 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2f5d50]">
@@ -89,6 +90,10 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </header>
+
+        <div className="mb-5">
+          <DashboardFocusClient />
+        </div>
 
         <div className="mb-4">
           <UsageSummaryClient />

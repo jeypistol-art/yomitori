@@ -102,8 +102,8 @@ export default function UsageSummaryClient({
   const statusMessage = isLimitReached
     ? "今月の登録上限に達しています。追加パックまたは上位プランを検討してください。"
     : isNearLimit
-      ? "今月の登録数が上限に近づいています。追加登録が多い月は追加パックを検討してください。"
-      : "今月の登録枠には余裕があります。";
+      ? `今月あと${usage.remaining_count}件の書類を自動処理できます。追加登録が多い月は追加パックを検討してください。`
+      : `今月あと${usage.remaining_count}件の書類を自動処理できます。`;
 
   if (compact) {
     return (
@@ -115,7 +115,7 @@ export default function UsageSummaryClient({
               {usage.used_count} / {limit} 件
             </h2>
             <p className="mt-1 text-xs font-semibold text-[#6b7280]">
-              {plan.name} / 残り {usage.remaining_count}件
+              {plan.name} / あと {usage.remaining_count}件
             </p>
           </div>
           <Link
