@@ -11,6 +11,40 @@ export type SendEmailResult = {
   messageId: string | null;
 };
 
+let lastResendRequestAt = 0;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getResendMinIntervalMs() {
+  const value = Number(process.env.RESEND_MIN_INTERVAL_MS);
+  if (!Number.isFinite(value) || value < 0) {
+    return 650;
+  }
+  return Math.max(500, Math.min(value, 5000));
+}
+
+function getRetryDelayMs(response: Response) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(seconds * 1000, 10000);
+    }
+  }
+  return 1200;
+}
+
+async function throttleResendRequests() {
+  const minIntervalMs = getResendMinIntervalMs();
+  const elapsed = Date.now() - lastResendRequestAt;
+  if (elapsed < minIntervalMs) {
+    await sleep(minIntervalMs - elapsed);
+  }
+  lastResendRequestAt = Date.now();
+}
+
 export function getDeliveryMode() {
   const mode = process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase();
   if (mode === "log" || mode === "send") {
@@ -74,23 +108,40 @@ async function sendWithResend(args: SendEmailArgs): Promise<SendEmailResult> {
     throw new Error("RESEND_API_KEY is required for Resend delivery");
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: requireEmailFrom(),
-      to: [args.to],
-      subject: args.subject,
-      html: args.html,
-      text: args.text,
-      reply_to: args.replyTo || undefined,
-    }),
+  const body = JSON.stringify({
+    from: requireEmailFrom(),
+    to: [args.to],
+    subject: args.subject,
+    html: args.html,
+    text: args.text,
+    reply_to: args.replyTo || undefined,
   });
 
-  const payload = (await response.json().catch(() => ({}))) as { id?: string; message?: string };
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await throttleResendRequests();
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    if (response.status !== 429) {
+      break;
+    }
+    await sleep(getRetryDelayMs(response));
+  }
+
+  const payload = (await response?.json().catch(() => ({}))) as {
+    id?: string;
+    message?: string;
+  };
+  if (!response) {
+    throw new Error("Resend delivery failed");
+  }
   if (!response.ok) {
     throw new Error(payload.message || `Resend delivery failed: ${response.status}`);
   }
