@@ -13,11 +13,17 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth_options";
 import DashboardFocusClient from "@/components/DashboardFocusClient";
+import PlanUpgradePanel from "@/components/PlanUpgradePanel";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
+import { getCurrentOrganization } from "@/lib/current_organization";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+  const currentOrganization = await getCurrentOrganization(session.user.id);
+  if (!currentOrganization) {
     redirect("/login");
   }
 
@@ -97,6 +103,10 @@ export default async function DashboardPage() {
 
         <div className="mb-4">
           <UsageSummaryClient />
+        </div>
+
+        <div className="mb-4">
+          <PlanUpgradePanel currentPlanCode={currentOrganization.plan_code} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

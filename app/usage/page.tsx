@@ -4,6 +4,7 @@ import { ChevronLeft, CheckCircle2 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
+import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
 import { EXTRA_PACK_CATALOG, PLAN_CATALOG } from "@/lib/usage_catalog";
@@ -110,6 +111,8 @@ export default async function UsagePage() {
                 })}
               </div>
             </section>
+
+            <PlanFeatureMatrix currentPlanCode={currentOrganization.plan_code} />
           </div>
 
           <aside className="space-y-6">

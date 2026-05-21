@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import TeamMembersClient from "@/components/TeamMembersClient";
+import FeatureGateNotice from "@/components/FeatureGateNotice";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
 
@@ -47,7 +48,13 @@ export default async function TeamPage() {
           </div>
         </header>
 
-        <TeamMembersClient />
+        <div className="space-y-5">
+          <FeatureGateNotice
+            currentPlanCode={currentOrganization.plan_code}
+            featureKey="team_members"
+          />
+          <TeamMembersClient />
+        </div>
       </div>
     </main>
   );
