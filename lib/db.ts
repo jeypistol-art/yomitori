@@ -7,15 +7,25 @@ export type QueryResult<T = QueryResultRow> = {
   rowCount: number;
 };
 
-const databaseUrl = process.env.DATABASE_URL ?? "";
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not set");
+let currentDatabaseUrl = "";
+let sql: ReturnType<typeof neon> | null = null;
+
+function getClient() {
+  const databaseUrl = process.env.DATABASE_URL?.trim() ?? "";
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is not set");
+  }
+
+  if (!sql || currentDatabaseUrl !== databaseUrl) {
+    currentDatabaseUrl = databaseUrl;
+    sql = neon(databaseUrl);
+  }
+
+  return sql;
 }
 
-let sql = neon(databaseUrl);
-
 function resetClient() {
-  sql = neon(databaseUrl);
+  sql = currentDatabaseUrl ? neon(currentDatabaseUrl) : null;
 }
 
 export async function query<T = QueryResultRow>(
@@ -23,7 +33,7 @@ export async function query<T = QueryResultRow>(
   params: unknown[] = []
 ): Promise<QueryResult<T>> {
   try {
-    const rows = await sql(text, params as unknown[]);
+    const rows = await getClient()(text, params as unknown[]);
     return {
       rows: (rows as T[]) ?? [],
       rowCount: (rows as T[])?.length ?? 0,
@@ -35,7 +45,7 @@ export async function query<T = QueryResultRow>(
         : "";
     if (code === "ECONNRESET") {
       resetClient();
-      const retry = await sql(text, params as unknown[]);
+      const retry = await getClient()(text, params as unknown[]);
       return {
         rows: (retry as T[]) ?? [],
         rowCount: (retry as T[])?.length ?? 0,
@@ -44,4 +54,3 @@ export async function query<T = QueryResultRow>(
     throw err;
   }
 }
-
