@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "yomitori-docutask",
-  "main": ".open-next/worker.js",
+  "main": "custom-worker.ts",
   "compatibility_date": "2026-05-08",
   "compatibility_flags": [
     "nodejs_compat",
@@ -10,6 +10,11 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
+    ]
   },
   "r2_buckets": [
     {
