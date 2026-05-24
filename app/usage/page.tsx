@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, CheckCircle2 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import BillingCheckoutButton from "@/components/BillingCheckoutButton";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
@@ -106,6 +107,19 @@ export default async function UsagePage() {
                           </li>
                         ))}
                       </ul>
+                      {isCurrent ? (
+                        <div className="mt-4 h-10 rounded-md border border-[#cde5d5] bg-white px-3 py-2 text-center text-sm font-bold text-[#2f5d50]">
+                          現在のプラン
+                        </div>
+                      ) : (
+                        <BillingCheckoutButton
+                          endpoint="/api/billing/checkout"
+                          payload={{ plan_code: plan.code }}
+                          className="mt-4 h-10 w-full rounded-md bg-[#2f5d50] px-3 text-sm font-bold text-white hover:bg-[#24483e] disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          このプランに変更
+                        </BillingCheckoutButton>
+                      )}
                     </article>
                   );
                 })}
@@ -135,13 +149,13 @@ export default async function UsagePage() {
                         {pack.priceLabel}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      disabled
-                      className="mt-4 h-10 w-full rounded-md border border-[#d9ded3] px-3 text-sm font-bold text-[#6b7280] disabled:opacity-70"
+                    <BillingCheckoutButton
+                      endpoint="/api/billing/extra-pack-checkout"
+                      payload={{ pack_code: pack.code }}
+                      className="mt-4 h-10 w-full rounded-md bg-[#2f5d50] px-3 text-sm font-bold text-white hover:bg-[#24483e] disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      決済連携後に有効化
-                    </button>
+                      追加パックを購入
+                    </BillingCheckoutButton>
                   </div>
                 ))}
               </div>

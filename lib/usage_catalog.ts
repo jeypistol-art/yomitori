@@ -82,6 +82,14 @@ export function getPlanCatalogItem(planCode: string) {
   return PLAN_CATALOG.find((plan) => plan.code === planCode) ?? PLAN_CATALOG[0];
 }
 
+export function findPlanCatalogItem(planCode: string) {
+  return PLAN_CATALOG.find((plan) => plan.code === planCode) ?? null;
+}
+
 export function getPlanIncludedCount(planCode: string) {
   return getPlanCatalogItem(planCode).includedDocuments;
+}
+
+export function findExtraPackCatalogItem(packCode: string) {
+  return EXTRA_PACK_CATALOG.find((pack) => pack.code === packCode) ?? null;
 }
