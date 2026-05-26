@@ -9,13 +9,21 @@ import {
   getOrCreateStripeCustomerForOrganization,
   getPlanPriceConfig,
 } from "@/lib/stripe_billing";
-import { syncStripeSubscription } from "@/lib/stripe_subscription_sync";
 
 export const dynamic = "force-dynamic";
 
 type CheckoutRequest = {
   plan_code?: unknown;
 };
+
+function stripeReferenceId<T extends { id: string }>(
+  value: string | T | null | undefined
+) {
+  if (!value) {
+    return null;
+  }
+  return typeof value === "string" ? value : value.id;
+}
 
 async function readJson(request: Request): Promise<CheckoutRequest> {
   return request.json().catch(() => ({}));
@@ -62,27 +70,42 @@ export async function POST(request: Request) {
       if (!subscriptionItem) {
         throw new ApiError(409, "Subscription item not found");
       }
+      const customerId = stripeReferenceId(subscription.customer);
+      if (!customerId) {
+        throw new ApiError(409, "Subscription customer not found");
+      }
 
-      const updatedSubscription = await stripe.subscriptions.update(
-        activeSubscriptionId,
-        {
-          items: [
-            {
-              id: subscriptionItem.id,
-              price: plan.priceId,
-              quantity: 1,
+      const portalConfigurationId =
+        process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID?.trim();
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        ...(portalConfigurationId ? { configuration: portalConfigurationId } : {}),
+        locale: "ja",
+        return_url: `${appBaseUrl}/usage?plan_change=return`,
+        flow_data: {
+          type: "subscription_update_confirm",
+          subscription_update_confirm: {
+            subscription: activeSubscriptionId,
+            items: [
+              {
+                id: subscriptionItem.id,
+                price: plan.priceId,
+                quantity: 1,
+              },
+            ],
+          },
+          after_completion: {
+            type: "redirect",
+            redirect: {
+              return_url: `${appBaseUrl}/usage?plan_change=success`,
             },
-          ],
-          metadata,
-          proration_behavior: "always_invoice",
-          payment_behavior: "error_if_incomplete",
-        }
-      );
-      await syncStripeSubscription(updatedSubscription);
+          },
+        },
+      });
 
       return NextResponse.json({
         data: {
-          redirect_url: `${appBaseUrl}/usage?plan_change=success`,
+          checkout_url: portalSession.url,
         },
       });
     }
