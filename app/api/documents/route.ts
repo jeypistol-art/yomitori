@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
+import { requireBillingAccess } from "@/lib/billing_access";
 import { query } from "@/lib/db";
 import {
   assertCounterpartyBelongsToOrganization,
@@ -179,6 +180,10 @@ export async function POST(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
     requireOperationalWrite(currentOrganization);
+    await requireBillingAccess(
+      currentOrganization.organization_id,
+      "document_processing"
+    );
 
     const formData = await request.formData();
     const files = formData.getAll("files").filter(isUploadFile);

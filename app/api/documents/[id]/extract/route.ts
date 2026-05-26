@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
+import { requireBillingAccess } from "@/lib/billing_access";
 import { query } from "@/lib/db";
 import { runDocumentAiExtraction } from "@/lib/document_ai_extraction";
 import { requireOperationalWrite } from "@/lib/permissions";
@@ -14,6 +15,10 @@ export async function POST(_request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
     requireOperationalWrite(currentOrganization);
+    await requireBillingAccess(
+      currentOrganization.organization_id,
+      "document_processing"
+    );
 
     const document = await query<{ id: string }>(
       `SELECT id

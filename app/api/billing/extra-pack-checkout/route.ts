@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
+import { requireBillingAccess } from "@/lib/billing_access";
 import { requireAdminWrite } from "@/lib/permissions";
 import { getStripe } from "@/lib/stripe";
 import {
@@ -37,6 +38,10 @@ export async function POST(request: Request) {
   try {
     const { session, currentOrganization } = await requireApiContext();
     requireAdminWrite(currentOrganization);
+    await requireBillingAccess(
+      currentOrganization.organization_id,
+      "extra_pack_purchase"
+    );
 
     const body = await readJson(request);
     const packCode = typeof body.pack_code === "string" ? body.pack_code : "";

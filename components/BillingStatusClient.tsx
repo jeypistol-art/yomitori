@@ -16,6 +16,18 @@ type BillingSubscription = {
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
   updated_at: string | null;
+  billing_access?: {
+    document_processing?: BillingAccess;
+    extra_pack_purchase?: BillingAccess;
+  };
+};
+
+type BillingAccess = {
+  allowed: boolean;
+  status: string;
+  label: string;
+  severity: "ok" | "warning" | "blocked";
+  message: string;
 };
 
 type ApiResponse<T> = {
@@ -146,6 +158,11 @@ export default function BillingStatusClient() {
         ? "Stripeの契約状態を確認してください。"
         : "まだStripeサブスクリプションはありません。",
     };
+  const documentProcessingAccess = subscription?.billing_access?.document_processing;
+  const extraPackAccess = subscription?.billing_access?.extra_pack_purchase;
+  const blockedAccess = [documentProcessingAccess, extraPackAccess].find(
+    (access) => access && !access.allowed
+  );
 
   return (
     <section className="border border-[#d9ded3] bg-white">
@@ -176,6 +193,18 @@ export default function BillingStatusClient() {
                 ? "現在の期間終了時に解約予定です。"
                 : statusInfo.note}
             </p>
+
+            {blockedAccess ? (
+              <p
+                className={
+                  blockedAccess.severity === "blocked"
+                    ? "border border-[#f1c9c3] bg-[#fff5f2] px-3 py-2 text-sm font-semibold text-[#b42318]"
+                    : "border border-[#f0d6a8] bg-[#fff8eb] px-3 py-2 text-sm font-semibold text-[#9a5b13]"
+                }
+              >
+                {blockedAccess.message}
+              </p>
+            ) : null}
 
             <dl className="grid gap-3 text-sm">
               <div className="border border-[#e1e6dc] p-3">
