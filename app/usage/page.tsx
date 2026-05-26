@@ -116,6 +116,8 @@ export default async function UsagePage() {
                           endpoint="/api/billing/checkout"
                           payload={{ plan_code: plan.code }}
                           className="mt-4 h-10 w-full rounded-md bg-[#2f5d50] px-3 text-sm font-bold text-white hover:bg-[#24483e] disabled:cursor-not-allowed disabled:opacity-70"
+                          confirmMessage={`${plan.name}へプラン変更します。差額が請求または調整される場合があります。続行しますか？`}
+                          loadingLabel="プランを変更中"
                         >
                           このプランに変更
                         </BillingCheckoutButton>
@@ -153,6 +155,7 @@ export default async function UsagePage() {
                       endpoint="/api/billing/extra-pack-checkout"
                       payload={{ pack_code: pack.code }}
                       className="mt-4 h-10 w-full rounded-md bg-[#2f5d50] px-3 text-sm font-bold text-white hover:bg-[#24483e] disabled:cursor-not-allowed disabled:opacity-70"
+                      loadingLabel="決済ページを作成中"
                     >
                       追加パックを購入
                     </BillingCheckoutButton>

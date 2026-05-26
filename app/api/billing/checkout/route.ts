@@ -9,6 +9,7 @@ import {
   getOrCreateStripeCustomerForOrganization,
   getPlanPriceConfig,
 } from "@/lib/stripe_billing";
+import { syncStripeSubscription } from "@/lib/stripe_subscription_sync";
 
 export const dynamic = "force-dynamic";
 
@@ -35,27 +36,6 @@ export async function POST(request: Request) {
       throw new ApiError(400, "現在のプランと同じです");
     }
 
-    const activeSubscription = await query<{ id: string }>(
-      `SELECT id
-       FROM subscriptions
-       WHERE organization_id = $1
-         AND status IN ('active', 'trialing', 'past_due', 'incomplete')
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [currentOrganization.organization_id]
-    );
-    if (activeSubscription.rows[0]) {
-      throw new ApiError(
-        409,
-        "既存サブスクリプションのプラン変更は管理画面実装後に有効化します"
-      );
-    }
-
-    const customerId = await getOrCreateStripeCustomerForOrganization({
-      organizationId: currentOrganization.organization_id,
-      organizationName: currentOrganization.organization_name,
-      fallbackEmail: session.user?.email,
-    });
     const appBaseUrl = getAppBaseUrl();
     const metadata = {
       item_type: "subscription",
@@ -63,8 +43,57 @@ export async function POST(request: Request) {
       member_id: currentOrganization.member_id,
       plan_code: plan.code,
     };
+    const stripe = getStripe();
 
-    const checkoutSession = await getStripe().checkout.sessions.create({
+    const activeSubscription = await query<{ stripe_subscription_id: string }>(
+      `SELECT stripe_subscription_id
+       FROM subscriptions
+       WHERE organization_id = $1
+         AND status IN ('active', 'trialing', 'past_due', 'incomplete')
+         AND stripe_subscription_id IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [currentOrganization.organization_id]
+    );
+    const activeSubscriptionId = activeSubscription.rows[0]?.stripe_subscription_id;
+    if (activeSubscriptionId) {
+      const subscription = await stripe.subscriptions.retrieve(activeSubscriptionId);
+      const subscriptionItem = subscription.items.data[0];
+      if (!subscriptionItem) {
+        throw new ApiError(409, "Subscription item not found");
+      }
+
+      const updatedSubscription = await stripe.subscriptions.update(
+        activeSubscriptionId,
+        {
+          items: [
+            {
+              id: subscriptionItem.id,
+              price: plan.priceId,
+              quantity: 1,
+            },
+          ],
+          metadata,
+          proration_behavior: "always_invoice",
+          payment_behavior: "error_if_incomplete",
+        }
+      );
+      await syncStripeSubscription(updatedSubscription);
+
+      return NextResponse.json({
+        data: {
+          redirect_url: `${appBaseUrl}/usage?plan_change=success`,
+        },
+      });
+    }
+
+    const customerId = await getOrCreateStripeCustomerForOrganization({
+      organizationId: currentOrganization.organization_id,
+      organizationName: currentOrganization.organization_name,
+      fallbackEmail: session.user?.email,
+    });
+
+    const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
       client_reference_id: currentOrganization.organization_id,
