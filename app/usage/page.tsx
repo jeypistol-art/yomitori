@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, CheckCircle2 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import BillingReturnSyncClient from "@/components/BillingReturnSyncClient";
 import BillingCheckoutButton from "@/components/BillingCheckoutButton";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
@@ -14,7 +15,14 @@ export const metadata: Metadata = {
   title: "利用状況",
 };
 
-export default async function UsagePage() {
+type UsagePageProps = {
+  searchParams: Promise<{
+    checkout?: string;
+    plan_change?: string;
+  }>;
+};
+
+export default async function UsagePage({ searchParams }: UsagePageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     redirect("/login");
@@ -25,9 +33,17 @@ export default async function UsagePage() {
     redirect("/login");
   }
 
+  const resolvedSearchParams = await searchParams;
+  const shouldSyncBilling =
+    resolvedSearchParams.checkout === "success" ||
+    resolvedSearchParams.plan_change === "success" ||
+    resolvedSearchParams.plan_change === "return" ||
+    resolvedSearchParams.plan_change === "synced";
+
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
+        <BillingReturnSyncClient shouldSync={shouldSyncBilling} />
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link
