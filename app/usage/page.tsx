@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import BillingReturnSyncClient from "@/components/BillingReturnSyncClient";
 import BillingCheckoutButton from "@/components/BillingCheckoutButton";
+import BillingStatusClient from "@/components/BillingStatusClient";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
@@ -148,6 +149,8 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           </div>
 
           <aside className="space-y-6">
+            <BillingStatusClient />
+
             <section className="border border-[#d9ded3] bg-white">
               <div className="border-b border-[#e5e9df] px-5 py-4">
                 <p className="text-sm font-bold text-[#2f5d50]">Extra Packs</p>
