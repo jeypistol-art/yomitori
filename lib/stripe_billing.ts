@@ -12,12 +12,29 @@ type PriceConfig = {
   priceId: string;
 };
 
-function requiredEnv(name: string) {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new ApiError(500, `${name} is not configured`);
+function optionalEnv(name: string) {
+  return process.env[name]?.trim() || null;
+}
+
+function requiredFirstEnv(names: string[]) {
+  for (const name of names) {
+    const value = optionalEnv(name);
+    if (value) {
+      return value;
+    }
   }
-  return value;
+
+  throw new ApiError(500, `${names.join(" or ")} is not configured`);
+}
+
+function planPriceEnvNames(planCode: string) {
+  const upperCode = planCode.toUpperCase();
+  return [`STRIPE_${upperCode}_PRICE_ID`, `STRIPE_PRICE_${upperCode}`];
+}
+
+function extraPackPriceEnvNames(packCode: string) {
+  const upperCode = packCode.toUpperCase();
+  return [`STRIPE_${upperCode}_PRICE_ID`, `STRIPE_PRICE_${upperCode}`];
 }
 
 export function getAppBaseUrl() {
@@ -34,10 +51,9 @@ export function getPlanPriceConfig(planCode: string): (PlanCatalogItem & PriceCo
     return null;
   }
 
-  const envName = `STRIPE_${plan.code.toUpperCase()}_PRICE_ID`;
   return {
     ...plan,
-    priceId: requiredEnv(envName),
+    priceId: requiredFirstEnv(planPriceEnvNames(plan.code)),
   };
 }
 
@@ -49,10 +65,9 @@ export function getExtraPackPriceConfig(
     return null;
   }
 
-  const envName = `STRIPE_${pack.code.toUpperCase()}_PRICE_ID`;
   return {
     ...pack,
-    priceId: requiredEnv(envName),
+    priceId: requiredFirstEnv(extraPackPriceEnvNames(pack.code)),
   };
 }
 
@@ -63,8 +78,9 @@ export function getPlanCodeByStripePriceId(priceId: string | null | undefined) {
 
   return (
     PLAN_CATALOG.find((plan) => {
-      const envName = `STRIPE_${plan.code.toUpperCase()}_PRICE_ID`;
-      return process.env[envName]?.trim() === priceId;
+      return planPriceEnvNames(plan.code).some((envName) => {
+        return optionalEnv(envName) === priceId;
+      });
     })?.code ?? null
   );
 }
