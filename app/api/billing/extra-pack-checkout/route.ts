@@ -19,6 +19,20 @@ async function readJson(request: Request): Promise<ExtraPackCheckoutRequest> {
   return request.json().catch(() => ({}));
 }
 
+function getStripeErrorMessage(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "type" in error &&
+    "message" in error &&
+    String((error as { type?: unknown }).type).startsWith("Stripe")
+  ) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === "string" ? message : null;
+  }
+  return null;
+}
+
 export async function POST(request: Request) {
   try {
     const { session, currentOrganization } = await requireApiContext();
@@ -70,6 +84,10 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    const stripeMessage = getStripeErrorMessage(error);
+    if (stripeMessage) {
+      return jsonApiError(new ApiError(400, stripeMessage));
+    }
     return jsonApiError(error);
   }
 }
