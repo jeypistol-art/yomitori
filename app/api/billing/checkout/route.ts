@@ -9,6 +9,7 @@ import {
   getOrCreateStripeCustomerForOrganization,
   getPlanPriceConfig,
 } from "@/lib/stripe_billing";
+import { syncStripeSubscription } from "@/lib/stripe_subscription_sync";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,16 @@ export async function POST(request: Request) {
       if (!subscriptionItem) {
         throw new ApiError(409, "Subscription item not found");
       }
+      const currentQuantity = subscriptionItem.quantity ?? 1;
+      if (subscriptionItem.price.id === plan.priceId && currentQuantity === 1) {
+        await syncStripeSubscription(subscription);
+        return NextResponse.json({
+          data: {
+            redirect_url: `${appBaseUrl}/usage?plan_change=synced`,
+          },
+        });
+      }
+
       const customerId = stripeReferenceId(subscription.customer);
       if (!customerId) {
         throw new ApiError(409, "Subscription customer not found");
