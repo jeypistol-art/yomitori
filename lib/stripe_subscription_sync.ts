@@ -29,7 +29,7 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription) 
   const metadata = subscription.metadata;
   let organizationId = metadataValue(metadata, "organization_id");
   const planCode =
-    metadataValue(metadata, "plan_code") || getPlanCodeByStripePriceId(priceId);
+    getPlanCodeByStripePriceId(priceId) || metadataValue(metadata, "plan_code");
 
   if (!organizationId && customerId) {
     const organization = await query<{ id: string }>(
