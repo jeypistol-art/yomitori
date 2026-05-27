@@ -20,6 +20,7 @@ type UsagePageProps = {
   searchParams: Promise<{
     checkout?: string;
     plan_change?: string;
+    billing_portal?: string;
   }>;
 };
 
@@ -39,7 +40,8 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
     resolvedSearchParams.checkout === "success" ||
     resolvedSearchParams.plan_change === "success" ||
     resolvedSearchParams.plan_change === "return" ||
-    resolvedSearchParams.plan_change === "synced";
+    resolvedSearchParams.plan_change === "synced" ||
+    resolvedSearchParams.billing_portal === "return";
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">

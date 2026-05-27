@@ -15,11 +15,25 @@ type BillingSubscription = {
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
+  cancel_at: string | null;
+  canceled_at: string | null;
+  scheduled_cancel_at: string | null;
+  pending_update: PendingBillingUpdate | null;
+  stripe_sync_warning: string | null;
   updated_at: string | null;
   billing_access?: {
     document_processing?: BillingAccess;
     extra_pack_purchase?: BillingAccess;
   };
+};
+
+type PendingBillingUpdate = {
+  source: "pending_update" | "subscription_schedule";
+  price_id: string | null;
+  plan_code: string | null;
+  plan_name: string | null;
+  effective_at: string | null;
+  expires_at: string | null;
 };
 
 type BillingAccess = {
@@ -163,6 +177,14 @@ export default function BillingStatusClient() {
   const blockedAccess = [documentProcessingAccess, extraPackAccess].find(
     (access) => access && !access.allowed
   );
+  const pendingPlanName =
+    subscription?.pending_update?.plan_name ??
+    (subscription?.pending_update?.plan_code
+      ? getPlanCatalogItem(subscription.pending_update.plan_code).name
+      : null);
+  const scheduledCancelAt =
+    subscription?.scheduled_cancel_at ??
+    (subscription?.cancel_at_period_end ? subscription.current_period_end : null);
 
   return (
     <section className="border border-[#d9ded3] bg-white">
@@ -188,11 +210,31 @@ export default function BillingStatusClient() {
               </span>
             </div>
 
-            <p className="border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-2 text-sm font-semibold text-[#4b5563]">
-              {subscription?.cancel_at_period_end
-                ? "現在の期間終了時に解約予定です。"
-                : statusInfo.note}
-            </p>
+            <div className="space-y-2">
+              <p className="border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-2 text-sm font-semibold text-[#4b5563]">
+                {statusInfo.note}
+              </p>
+
+              {scheduledCancelAt ? (
+                <p className="border border-[#f0d6a8] bg-[#fff8eb] px-3 py-2 text-sm font-semibold text-[#9a5b13]">
+                  {formatDateTime(scheduledCancelAt)}
+                  までは現在のプランを利用できます。期間終了後に解約されます。
+                </p>
+              ) : null}
+
+              {subscription?.pending_update ? (
+                <p className="border border-[#d7e6d2] bg-[#f1faf4] px-3 py-2 text-sm font-semibold text-[#2f5d50]">
+                  {formatDateTime(subscription.pending_update.effective_at)}
+                  に{pendingPlanName ?? "別プラン"}へ変更予定です。
+                </p>
+              ) : null}
+
+              {subscription?.stripe_sync_warning ? (
+                <p className="border border-[#f0d6a8] bg-[#fff8eb] px-3 py-2 text-sm font-semibold text-[#9a5b13]">
+                  Stripeの最新状態を取得できませんでした。表示は最終同期時点の情報です。
+                </p>
+              ) : null}
+            </div>
 
             {blockedAccess ? (
               <p
@@ -217,6 +259,16 @@ export default function BillingStatusClient() {
                 <dt className="font-bold text-[#6b7280]">最終同期</dt>
                 <dd className="mt-1 font-semibold">
                   {formatDateTime(subscription?.updated_at ?? null)}
+                </dd>
+              </div>
+              <div className="border border-[#e1e6dc] p-3">
+                <dt className="font-bold text-[#6b7280]">予定されている変更</dt>
+                <dd className="mt-1 font-semibold">
+                  {subscription?.pending_update
+                    ? `${pendingPlanName ?? "別プラン"}へ変更`
+                    : scheduledCancelAt
+                      ? "期間終了時に解約"
+                      : "なし"}
                 </dd>
               </div>
             </dl>
