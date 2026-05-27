@@ -70,7 +70,7 @@ export async function GET(request: Request) {
            al.action,
            al.target_type,
            al.target_id,
-           COALESCE(d.title, t.title, rt.title) AS target_title,
+           COALESCE(d.title, t.title, rt.title, target_o.name) AS target_title,
            al.before_json,
            al.after_json,
            al.created_at
@@ -95,6 +95,10 @@ export async function GET(request: Request) {
          LEFT JOIN tasks rt
            ON rt.organization_id = r.organization_id
           AND rt.id = r.task_id
+         LEFT JOIN organizations target_o
+           ON al.target_type = 'organization'
+          AND target_o.id = al.target_id
+          AND target_o.id = al.organization_id
          WHERE ${where.join(" AND ")}
          ORDER BY al.created_at DESC
          LIMIT 200`,

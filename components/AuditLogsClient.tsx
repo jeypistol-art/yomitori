@@ -52,6 +52,14 @@ type AuditView = {
 };
 
 const actionLabels: Record<string, string> = {
+  "billing.cancel_schedule_canceled": "解約予定取消",
+  "billing.cancel_scheduled": "解約予定",
+  "billing.plan_change_scheduled": "プラン変更予定",
+  "billing.plan_changed": "プラン変更",
+  "billing.profile_updated": "請求先情報更新",
+  "billing.subscription_canceled": "契約解約",
+  "billing.subscription_created": "契約作成",
+  "billing.subscription_status_changed": "契約状態変更",
   "document.approved": "書類承認",
   "document.deleted": "書類削除",
   "review_draft.saved": "下書き保存",
@@ -61,6 +69,7 @@ const actionLabels: Record<string, string> = {
 
 const targetTypeLabels: Record<string, string> = {
   document: "書類",
+  organization: "組織",
   task: "タスク",
   reminder: "リマインド",
 };
@@ -77,6 +86,24 @@ const statusLabels: Record<string, string> = {
 const channelLabels: Record<string, string> = {
   email: "メール",
   in_app: "アプリ内",
+};
+
+const planLabels: Record<string, string> = {
+  personal: "Personal",
+  business: "Business",
+  pro: "Pro",
+  enterprise: "Enterprise",
+};
+
+const subscriptionStatusLabels: Record<string, string> = {
+  active: "有効",
+  trialing: "トライアル",
+  past_due: "支払い確認中",
+  incomplete: "未完了",
+  incomplete_expired: "未完了期限切れ",
+  unpaid: "未払い",
+  canceled: "解約済み",
+  paused: "停止中",
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -155,6 +182,10 @@ function titleOf(log: AuditLog, document: Record<string, unknown> = {}) {
   return textValue(document.title) ?? log.target_title ?? log.target_id ?? "対象なし";
 }
 
+function nestedRecord(value: unknown, key: string) {
+  return asRecord(asRecord(value)[key]);
+}
+
 function addDetail(
   details: AuditDetail[],
   label: string,
@@ -170,6 +201,123 @@ function addDetail(
 function buildAuditView(log: AuditLog): AuditView {
   const after = asRecord(log.after_json);
   const before = asRecord(log.before_json);
+
+  if (log.action.startsWith("billing.")) {
+    if (log.action === "billing.plan_change_scheduled") {
+      const scheduledChange = nestedRecord(after, "scheduled_change");
+      const currentPlan = textValue(scheduledChange.current_plan_code);
+      const scheduledPlan = textValue(scheduledChange.scheduled_plan_code);
+      const details: AuditDetail[] = [];
+      addDetail(details, "契約ID", scheduledChange.stripe_subscription_id);
+      addDetail(details, "現在のプラン", scheduledChange.current_plan_code, (value) => {
+        const plan = textValue(value);
+        return plan ? planLabels[plan] ?? plan : null;
+      });
+      addDetail(details, "変更予定プラン", scheduledChange.scheduled_plan_code, (value) => {
+        const plan = textValue(value);
+        return plan ? planLabels[plan] ?? plan : null;
+      });
+      addDetail(details, "変更予定日", scheduledChange.effective_at, formatDateTimeValue);
+      addDetail(details, "予定の種類", scheduledChange.source, (value) => {
+        const source = textValue(value);
+        if (source === "pending_update") {
+          return "保留中の更新";
+        }
+        if (source === "subscription_schedule") {
+          return "サブスクリプションスケジュール";
+        }
+        return source;
+      });
+
+      return {
+        summary: `次回更新時のプラン変更が予定されました。${
+          currentPlan ? planLabels[currentPlan] ?? currentPlan : "現在のプラン"
+        }から${
+          scheduledPlan ? planLabels[scheduledPlan] ?? scheduledPlan : "別プラン"
+        }へ変更予定です。`,
+        details,
+      };
+    }
+
+    const beforeSubscription = nestedRecord(before, "subscription");
+    const afterSubscription = nestedRecord(after, "subscription");
+    const beforePlan = textValue(beforeSubscription.plan_code);
+    const afterPlan = textValue(afterSubscription.plan_code);
+    const beforeStatus = textValue(beforeSubscription.status);
+    const afterStatus = textValue(afterSubscription.status);
+    const details: AuditDetail[] = [];
+
+    addDetail(details, "契約ID", afterSubscription.stripe_subscription_id);
+    addDetail(details, "変更前プラン", beforeSubscription.plan_code, (value) => {
+      const plan = textValue(value);
+      return plan ? planLabels[plan] ?? plan : null;
+    });
+    addDetail(details, "変更後プラン", afterSubscription.plan_code, (value) => {
+      const plan = textValue(value);
+      return plan ? planLabels[plan] ?? plan : null;
+    });
+    addDetail(details, "変更前ステータス", beforeSubscription.status, (value) => {
+      const status = textValue(value);
+      return status ? subscriptionStatusLabels[status] ?? status : null;
+    });
+    addDetail(details, "変更後ステータス", afterSubscription.status, (value) => {
+      const status = textValue(value);
+      return status ? subscriptionStatusLabels[status] ?? status : null;
+    });
+    addDetail(
+      details,
+      "現在期間の終了",
+      afterSubscription.current_period_end,
+      formatDateTimeValue
+    );
+    addDetail(details, "期間終了時に解約", afterSubscription.cancel_at_period_end);
+
+    if (log.action === "billing.subscription_created") {
+      return {
+        summary: `Stripe契約を作成しました。プランは${
+          afterPlan ? planLabels[afterPlan] ?? afterPlan : "未設定"
+        }です。`,
+        details,
+      };
+    }
+    if (log.action === "billing.plan_changed") {
+      return {
+        summary: `プランを${beforePlan ? planLabels[beforePlan] ?? beforePlan : "未設定"}から${
+          afterPlan ? planLabels[afterPlan] ?? afterPlan : "未設定"
+        }へ変更しました。`,
+        details,
+      };
+    }
+    if (log.action === "billing.cancel_scheduled") {
+      const endAt = formatDateTimeValue(afterSubscription.current_period_end);
+      return {
+        summary: `期間終了時の解約が予定されました。${
+          endAt ? `${endAt}までは利用できます。` : ""
+        }`,
+        details,
+      };
+    }
+    if (log.action === "billing.cancel_schedule_canceled") {
+      return {
+        summary: "期間終了時の解約予定を取り消しました。",
+        details,
+      };
+    }
+    if (log.action === "billing.subscription_canceled") {
+      return {
+        summary: "Stripe契約が解約済みになりました。",
+        details,
+      };
+    }
+    if (log.action === "billing.subscription_status_changed") {
+      return {
+        summary: `契約状態が${beforeStatus ? subscriptionStatusLabels[beforeStatus] ?? beforeStatus : "未設定"}から${
+          afterStatus ? subscriptionStatusLabels[afterStatus] ?? afterStatus : "未設定"
+        }へ変わりました。`,
+        details,
+      };
+    }
+  }
 
   if (log.action === "document.approved") {
     const document = asRecord(after.document);
