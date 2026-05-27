@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import BillingReturnSyncClient from "@/components/BillingReturnSyncClient";
 import BillingCheckoutButton from "@/components/BillingCheckoutButton";
+import BillingProfileClient from "@/components/BillingProfileClient";
 import BillingStatusClient from "@/components/BillingStatusClient";
 import BillingWebhookEventsClient from "@/components/BillingWebhookEventsClient";
 import ExtraPackHistoryClient from "@/components/ExtraPackHistoryClient";
@@ -153,6 +154,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           </div>
 
           <aside className="space-y-6">
+            <BillingProfileClient />
             <BillingStatusClient />
             <BillingWebhookEventsClient />
 
