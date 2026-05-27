@@ -7,6 +7,7 @@ import BillingReturnSyncClient from "@/components/BillingReturnSyncClient";
 import BillingCheckoutButton from "@/components/BillingCheckoutButton";
 import BillingStatusClient from "@/components/BillingStatusClient";
 import BillingWebhookEventsClient from "@/components/BillingWebhookEventsClient";
+import ExtraPackHistoryClient from "@/components/ExtraPackHistoryClient";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
@@ -186,6 +187,8 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
                 ))}
               </div>
             </section>
+
+            <ExtraPackHistoryClient />
 
             <section className="border border-[#d9ded3] bg-white p-5">
               <p className="text-sm font-bold text-[#2f5d50]">運用メモ</p>
