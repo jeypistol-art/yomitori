@@ -9,6 +9,7 @@ import BillingProfileClient from "@/components/BillingProfileClient";
 import BillingStatusClient from "@/components/BillingStatusClient";
 import BillingWebhookEventsClient from "@/components/BillingWebhookEventsClient";
 import ExtraPackHistoryClient from "@/components/ExtraPackHistoryClient";
+import UsageEventLedgerClient from "@/components/UsageEventLedgerClient";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
@@ -75,6 +76,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
             <UsageSummaryClient showExtraPacks={false} />
+            <UsageEventLedgerClient />
 
             <section className="border border-[#d9ded3] bg-white">
               <div className="border-b border-[#e5e9df] px-5 py-4">
