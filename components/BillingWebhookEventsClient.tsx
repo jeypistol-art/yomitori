@@ -27,8 +27,8 @@ type ApiResponse<T> = {
   error?: string;
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   const payload = (await response.json().catch(() => ({}))) as ApiResponse<T>;
   if (!response.ok) {
     const error = new Error(payload.error || "Request failed");
@@ -74,10 +74,13 @@ export default function BillingWebhookEventsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [forbidden, setForbidden] = useState(false);
+  const [retryingId, setRetryingId] = useState("");
+  const [notice, setNotice] = useState("");
 
   async function loadEvents() {
     setLoading(true);
     setError("");
+    setNotice("");
     try {
       const data = await fetchJson<WebhookEventsPayload>("/api/billing/webhook-events");
       setPayload(data);
@@ -90,6 +93,30 @@ export default function BillingWebhookEventsClient() {
       setError(err instanceof Error ? err.message : "Webhookイベントを読み込めませんでした");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function retryEvent(eventId: string) {
+    setRetryingId(eventId);
+    setError("");
+    setNotice("");
+    try {
+      await fetchJson<{ retried: boolean; already_processed: boolean }>(
+        "/api/billing/webhook-events/retry",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ event_id: eventId }),
+        }
+      );
+      await loadEvents();
+      setNotice("Webhookイベントを再処理しました。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Webhookイベントを再処理できませんでした");
+    } finally {
+      setRetryingId("");
     }
   }
 
@@ -131,6 +158,12 @@ export default function BillingWebhookEventsClient() {
         {error ? (
           <p className="border border-[#f1c9c3] bg-[#fff5f2] px-3 py-2 text-sm font-semibold text-[#b42318]">
             {error}
+          </p>
+        ) : null}
+
+        {notice ? (
+          <p className="border border-[#cde5d5] bg-[#f1faf4] px-3 py-2 text-sm font-semibold text-[#2f5d50]">
+            {notice}
           </p>
         ) : null}
 
@@ -195,6 +228,23 @@ export default function BillingWebhookEventsClient() {
                             <p className="mt-2 line-clamp-2 text-xs font-semibold text-[#b42318]">
                               {event.error_message}
                             </p>
+                          ) : null}
+                          {failed ? (
+                            <button
+                              type="button"
+                              onClick={() => retryEvent(event.id)}
+                              disabled={retryingId === event.id}
+                              className="mt-3 inline-flex h-8 items-center gap-2 rounded-md border border-[#f1c9c3] px-3 text-xs font-bold text-[#b42318] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <RefreshCw
+                                className={
+                                  retryingId === event.id
+                                    ? "h-3.5 w-3.5 animate-spin"
+                                    : "h-3.5 w-3.5"
+                                }
+                              />
+                              {retryingId === event.id ? "再処理中" : "再処理"}
+                            </button>
                           ) : null}
                         </div>
                       </div>
