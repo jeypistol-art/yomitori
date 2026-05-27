@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import BillingReturnSyncClient from "@/components/BillingReturnSyncClient";
 import BillingCheckoutButton from "@/components/BillingCheckoutButton";
 import BillingStatusClient from "@/components/BillingStatusClient";
+import BillingWebhookEventsClient from "@/components/BillingWebhookEventsClient";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
@@ -152,6 +153,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
 
           <aside className="space-y-6">
             <BillingStatusClient />
+            <BillingWebhookEventsClient />
 
             <section className="border border-[#d9ded3] bg-white">
               <div className="border-b border-[#e5e9df] px-5 py-4">
