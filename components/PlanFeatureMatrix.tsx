@@ -12,6 +12,7 @@ import {
   type FeatureKey,
 } from "@/lib/feature_gates";
 import { PLAN_CATALOG } from "@/lib/usage_catalog";
+import { getEnterpriseContactHref } from "@/lib/enterprise_contact";
 
 const themeLabels = {
   personal: "個人の効率化",
@@ -116,6 +117,7 @@ export default function PlanFeatureMatrix({
   currentPlanCode: string;
 }) {
   const currentAvailability = getFeatureAvailability(currentPlanCode);
+  const enterpriseContactHref = getEnterpriseContactHref();
 
   return (
     <section className="border border-[#d9ded3] bg-white">
@@ -124,7 +126,7 @@ export default function PlanFeatureMatrix({
         <h2 className="mt-1 text-xl font-bold">プラン別の機能差分</h2>
         <p className="mt-2 text-sm leading-6 text-[#4b5563]">
           課金差分は「AIが賢い」ではなく、チームで回せる、証跡が残る、業務に埋め込めることで設計しています。
-          利用可能な機能はクリックすると該当画面へ移動できます。準備中・個別提供の機能は状態だけ確認できます。
+          利用可能な機能はクリックすると該当画面へ移動できます。個別提供の機能は導入相談へ進めます。
         </p>
       </div>
       <div className="grid gap-3 p-5 lg:grid-cols-2">
@@ -138,15 +140,23 @@ export default function PlanFeatureMatrix({
           const destination = featureDestinations[feature.key];
           const isPlanAvailable = Boolean(availability?.available);
           const isReady = destination.status === "ready";
-          const isClickable = isPlanAvailable && isReady;
-          const cardClassName = isClickable
+          const isConsultation = destination.status === "consultation";
+          const isReadyLink = isPlanAvailable && isReady;
+          const isClickable = isReadyLink || isConsultation;
+          const href = isConsultation ? enterpriseContactHref : destination.href;
+          const opensNewTab = href.startsWith("http");
+          const cardClassName = isReadyLink
             ? "block border border-[#cde5d5] bg-[#f1faf4] p-4 transition hover:border-[#2f5d50] hover:bg-[#e7f5ec] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f5d50]"
-            : "cursor-not-allowed border border-[#e1e6dc] bg-[#f4f5f1] p-4 text-[#6b7280] opacity-75";
-          const actionLabel = isClickable
+            : isConsultation
+              ? "block border border-[#f0d6a8] bg-[#fff8eb] p-4 transition hover:border-[#9a5b13] hover:bg-[#fff3d7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5b13]"
+              : "cursor-not-allowed border border-[#e1e6dc] bg-[#f4f5f1] p-4 text-[#6b7280] opacity-75";
+          const actionLabel = isReadyLink
             ? destination.actionLabel
-            : !isPlanAvailable
-              ? `${requiredPlan?.name ?? feature.minimumPlan}以上で利用可能`
-              : destination.actionLabel;
+            : isConsultation
+              ? "導入相談へ"
+              : !isPlanAvailable
+                ? `${requiredPlan?.name ?? feature.minimumPlan}以上で利用可能`
+                : destination.actionLabel;
           const content = (
             <>
               <div className="flex items-start justify-between gap-3">
@@ -201,14 +211,20 @@ export default function PlanFeatureMatrix({
             </>
           );
 
-          return isClickable ? (
-            <Link
-              key={feature.key}
-              href={destination.href}
-              className={cardClassName}
-            >
+          return isReadyLink ? (
+            <Link key={feature.key} href={href} className={cardClassName}>
               {content}
             </Link>
+          ) : isConsultation ? (
+            <a
+              key={feature.key}
+              href={href}
+              className={cardClassName}
+              rel={opensNewTab ? "noreferrer" : undefined}
+              target={opensNewTab ? "_blank" : undefined}
+            >
+              {content}
+            </a>
           ) : (
             <div
               key={feature.key}

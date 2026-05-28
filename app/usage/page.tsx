@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, CheckCircle2, MessageCircle } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import BillingReturnSyncClient from "@/components/BillingReturnSyncClient";
@@ -14,6 +14,7 @@ import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { getEnterpriseContactHref } from "@/lib/enterprise_contact";
 import { EXTRA_PACK_CATALOG, PLAN_CATALOG } from "@/lib/usage_catalog";
 
 export const metadata: Metadata = {
@@ -46,6 +47,8 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
     resolvedSearchParams.plan_change === "return" ||
     resolvedSearchParams.plan_change === "synced" ||
     resolvedSearchParams.billing_portal === "return";
+  const enterpriseContactHref = getEnterpriseContactHref();
+  const opensNewTab = enterpriseContactHref.startsWith("http");
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -159,6 +162,35 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
             <BillingProfileClient />
             <BillingStatusClient />
             <BillingWebhookEventsClient />
+
+            <section
+              id="enterprise-contact"
+              className="border border-[#f0d6a8] bg-[#fff8eb] p-5"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#9a5b13]">
+                  <MessageCircle className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[#9a5b13]">
+                    Enterprise / 個別提供
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold">導入相談</h2>
+                  <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                    文書分類テンプレ、運用ルール設計、API/Webhook、初期設定支援は、書類種別や既存業務を確認して設計します。
+                  </p>
+                </div>
+              </div>
+              <a
+                href={enterpriseContactHref}
+                rel={opensNewTab ? "noreferrer" : undefined}
+                target={opensNewTab ? "_blank" : undefined}
+                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#9a5b13] px-3 text-sm font-bold text-white hover:bg-[#7c460d]"
+              >
+                導入相談を送る
+                <MessageCircle className="h-4 w-4" />
+              </a>
+            </section>
 
             <section className="border border-[#d9ded3] bg-white">
               <div className="border-b border-[#e5e9df] px-5 py-4">
