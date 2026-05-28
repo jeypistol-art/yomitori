@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, LockKeyhole } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock3,
+  Handshake,
+  LockKeyhole,
+} from "lucide-react";
 import {
   FEATURE_GATES,
   getFeatureAvailability,
@@ -19,71 +25,88 @@ const featureDestinations: Record<
   {
     href: string;
     actionLabel: string;
+    status: "ready" | "planned" | "consultation";
   }
 > = {
   personal_tasks: {
     href: "/tasks",
     actionLabel: "タスク一覧へ",
+    status: "ready",
   },
   calendar_sync: {
     href: "/reminders",
     actionLabel: "リマインドへ",
+    status: "ready",
   },
   team_members: {
     href: "/team",
     actionLabel: "担当者設定へ",
+    status: "ready",
   },
   assignee_workflow: {
     href: "/tasks",
     actionLabel: "タスク一覧へ",
+    status: "ready",
   },
   shared_ledger: {
     href: "/master-data",
     actionLabel: "台帳設定へ",
+    status: "ready",
   },
   monthly_work_queue: {
     href: "/unprocessed",
     actionLabel: "未処理一覧へ",
+    status: "ready",
   },
   audit_logs: {
     href: "/audit-logs",
     actionLabel: "監査ログへ",
+    status: "ready",
   },
   document_diff: {
     href: "/unprocessed",
-    actionLabel: "確認画面へ",
+    actionLabel: "提供準備中",
+    status: "planned",
   },
   advanced_permissions: {
     href: "/team",
     actionLabel: "担当者設定へ",
+    status: "ready",
   },
   branch_ledgers: {
     href: "/master-data",
-    actionLabel: "台帳設定へ",
+    actionLabel: "提供準備中",
+    status: "planned",
   },
   priority_processing: {
     href: "/unprocessed",
-    actionLabel: "未処理一覧へ",
+    actionLabel: "提供準備中",
+    status: "planned",
   },
   document_templates: {
     href: "/setup",
-    actionLabel: "初期設定へ",
+    actionLabel: "個別設計で提供",
+    status: "consultation",
   },
   api_webhooks: {
     href: "/usage",
-    actionLabel: "Webhook状況へ",
+    actionLabel: "提供準備中",
+    status: "planned",
   },
   onboarding_support: {
     href: "/setup",
-    actionLabel: "初期設定へ",
+    actionLabel: "個別支援で提供",
+    status: "consultation",
   },
   custom_rules: {
     href: "/setup",
-    actionLabel: "初期設定へ",
+    actionLabel: "個別設計で提供",
+    status: "consultation",
   },
   priority_support: {
     href: "/usage",
-    actionLabel: "契約状況へ",
+    actionLabel: "個別支援で提供",
+    status: "consultation",
   },
 };
 
@@ -101,7 +124,7 @@ export default function PlanFeatureMatrix({
         <h2 className="mt-1 text-xl font-bold">プラン別の機能差分</h2>
         <p className="mt-2 text-sm leading-6 text-[#4b5563]">
           課金差分は「AIが賢い」ではなく、チームで回せる、証跡が残る、業務に埋め込めることで設計しています。
-          利用可能な機能はクリックすると該当画面へ移動できます。
+          利用可能な機能はクリックすると該当画面へ移動できます。準備中・個別提供の機能は状態だけ確認できます。
         </p>
       </div>
       <div className="grid gap-3 p-5 lg:grid-cols-2">
@@ -113,10 +136,17 @@ export default function PlanFeatureMatrix({
             (plan) => plan.code === feature.minimumPlan
           );
           const destination = featureDestinations[feature.key];
-          const isAvailable = Boolean(availability?.available);
-          const cardClassName = isAvailable
+          const isPlanAvailable = Boolean(availability?.available);
+          const isReady = destination.status === "ready";
+          const isClickable = isPlanAvailable && isReady;
+          const cardClassName = isClickable
             ? "block border border-[#cde5d5] bg-[#f1faf4] p-4 transition hover:border-[#2f5d50] hover:bg-[#e7f5ec] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f5d50]"
             : "cursor-not-allowed border border-[#e1e6dc] bg-[#f4f5f1] p-4 text-[#6b7280] opacity-75";
+          const actionLabel = isClickable
+            ? destination.actionLabel
+            : !isPlanAvailable
+              ? `${requiredPlan?.name ?? feature.minimumPlan}以上で利用可能`
+              : destination.actionLabel;
           const content = (
             <>
               <div className="flex items-start justify-between gap-3">
@@ -128,35 +158,50 @@ export default function PlanFeatureMatrix({
                     {feature.label}
                   </h3>
                 </div>
-                {availability?.available ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    利用可
-                  </span>
-                ) : (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded bg-[#e9ece5] px-2 py-1 text-xs font-bold text-[#5f6b5f]">
-                    <LockKeyhole className="h-3.5 w-3.5" />
-                    {requiredPlan?.name ?? feature.minimumPlan}
-                  </span>
-                )}
+                <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                  {isReady && isPlanAvailable ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      利用可
+                    </span>
+                  ) : null}
+                  {destination.status === "planned" ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#edf0f2] px-2 py-1 text-xs font-bold text-[#4b5563]">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      準備中
+                    </span>
+                  ) : null}
+                  {destination.status === "consultation" ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#fff8eb] px-2 py-1 text-xs font-bold text-[#9a5b13]">
+                      <Handshake className="h-3.5 w-3.5" />
+                      個別提供
+                    </span>
+                  ) : null}
+                  {!isPlanAvailable ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#e9ece5] px-2 py-1 text-xs font-bold text-[#5f6b5f]">
+                      <LockKeyhole className="h-3.5 w-3.5" />
+                      {requiredPlan?.name ?? feature.minimumPlan}
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <p className="mt-2 text-sm leading-6 text-[#4b5563]">
                 {feature.description}
               </p>
               <div
                 className={
-                  isAvailable
+                  isClickable
                     ? "mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#2f5d50]"
                     : "mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#6b7280]"
                 }
               >
-                {isAvailable ? destination.actionLabel : "プラン変更で利用可能"}
-                {isAvailable ? <ArrowRight className="h-4 w-4" /> : null}
+                {actionLabel}
+                {isClickable ? <ArrowRight className="h-4 w-4" /> : null}
               </div>
             </>
           );
 
-          return isAvailable ? (
+          return isClickable ? (
             <Link
               key={feature.key}
               href={destination.href}
