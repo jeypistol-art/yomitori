@@ -21,6 +21,48 @@ const themeLabels = {
   embedded: "業務への埋め込み",
 };
 
+type PlannedFeatureRoadmapItem = {
+  featureKey: FeatureKey;
+  phase: string;
+  focus: string;
+  outcome: string;
+};
+
+const plannedFeatureRoadmap: PlannedFeatureRoadmapItem[] = [
+  {
+    featureKey: "document_diff",
+    phase: "設計中",
+    focus:
+      "同じ管理対象・同じ書類種別の前回版と比較し、期限、金額、提出物、注意事項の変化を抽出します。",
+    outcome:
+      "更新案内や行政通知で「前回と何が変わったか」を確認でき、見落としを減らします。",
+  },
+  {
+    featureKey: "branch_ledgers",
+    phase: "要件整理",
+    focus:
+      "施設、店舗、拠点ごとに台帳、書類、未処理タスクを絞り込める構成にします。",
+    outcome:
+      "複数拠点を持つ管理会社でも、担当範囲ごとの確認と引き継ぎがしやすくなります。",
+  },
+  {
+    featureKey: "priority_processing",
+    phase: "検証予定",
+    focus:
+      "至急、期限接近、高リスクの書類を未処理一覧や承認画面で上位表示します。",
+    outcome:
+      "処理順に迷う時間を減らし、重要書類から片付ける運用を作れます。",
+  },
+  {
+    featureKey: "api_webhooks",
+    phase: "個別要件確認",
+    focus:
+      "書類登録、AI抽出完了、タスク作成、リマインド送信などを外部システムへ通知します。",
+    outcome:
+      "既存の社内システムや管理ツールにYOMITORI DocuTaskを組み込めます。",
+  },
+];
+
 const featureDestinations: Record<
   FeatureKey,
   {
@@ -66,7 +108,7 @@ const featureDestinations: Record<
   },
   document_diff: {
     href: "/unprocessed",
-    actionLabel: "提供準備中",
+    actionLabel: "下のロードマップで確認",
     status: "planned",
   },
   advanced_permissions: {
@@ -76,12 +118,12 @@ const featureDestinations: Record<
   },
   branch_ledgers: {
     href: "/master-data",
-    actionLabel: "提供準備中",
+    actionLabel: "下のロードマップで確認",
     status: "planned",
   },
   priority_processing: {
     href: "/unprocessed",
-    actionLabel: "提供準備中",
+    actionLabel: "下のロードマップで確認",
     status: "planned",
   },
   document_templates: {
@@ -91,7 +133,7 @@ const featureDestinations: Record<
   },
   api_webhooks: {
     href: "/usage",
-    actionLabel: "提供準備中",
+    actionLabel: "下のロードマップで確認",
     status: "planned",
   },
   onboarding_support: {
@@ -153,6 +195,10 @@ export default function PlanFeatureMatrix({
             ? destination.actionLabel
             : isConsultation
               ? "導入相談へ"
+              : destination.status === "planned"
+                ? isPlanAvailable
+                  ? destination.actionLabel
+                  : `${requiredPlan?.name ?? feature.minimumPlan}以上で提供予定`
               : !isPlanAvailable
                 ? `${requiredPlan?.name ?? feature.minimumPlan}以上で利用可能`
                 : destination.actionLabel;
@@ -229,6 +275,84 @@ export default function PlanFeatureMatrix({
           );
         })}
       </div>
+
+      <div
+        id="feature-roadmap"
+        className="border-t border-[#e5e9df] bg-[#fbfcf8] px-5 py-5"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-[#2f5d50]">Roadmap</p>
+            <h3 className="mt-1 text-lg font-bold">
+              準備中機能ロードマップ
+            </h3>
+          </div>
+          <p className="max-w-2xl text-sm leading-6 text-[#4b5563]">
+            準備中の機能はまだ操作できません。ここでは、提供予定の方向性と対象プランを確認できます。
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {plannedFeatureRoadmap.map((item) => {
+            const feature = FEATURE_GATES.find(
+              (gate) => gate.key === item.featureKey
+            );
+            if (!feature) {
+              return null;
+            }
+
+            const requiredPlan = PLAN_CATALOG.find(
+              (plan) => plan.code === feature.minimumPlan
+            );
+            const availability = currentAvailability.find(
+              (entry) => entry.key === item.featureKey
+            );
+
+            return (
+              <article
+                key={item.featureKey}
+                className="border border-[#e1e6dc] bg-white p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#6b7280]">
+                      {themeLabels[feature.valueTheme]}
+                    </p>
+                    <h4 className="mt-1 break-words text-base font-bold">
+                      {feature.label}
+                    </h4>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    <span className="inline-flex items-center gap-1 rounded bg-[#edf0f2] px-2 py-1 text-xs font-bold text-[#4b5563]">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {item.phase}
+                    </span>
+                    <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
+                      {requiredPlan?.name ?? feature.minimumPlan}以上
+                    </span>
+                  </div>
+                </div>
+                <dl className="mt-3 space-y-3 text-sm leading-6">
+                  <div>
+                    <dt className="font-bold text-[#1f2933]">準備していること</dt>
+                    <dd className="mt-1 text-[#4b5563]">{item.focus}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-[#1f2933]">期待できる効果</dt>
+                    <dd className="mt-1 text-[#4b5563]">{item.outcome}</dd>
+                  </div>
+                </dl>
+                <p className="mt-4 text-xs font-semibold text-[#6b7280]">
+                  {availability?.available
+                    ? "現在のプラン対象ですが、提供開始までは操作できません。"
+                    : `${requiredPlan?.name ?? feature.minimumPlan}以上のプランで提供予定です。`}
+                </p>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="border-t border-[#e5e9df] px-5 py-4">
         <div className="grid gap-2 md:grid-cols-4">
           {PLAN_CATALOG.map((plan) => (
