@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { getLockedFeatures } from "@/lib/feature_gates";
 import { getPlanCatalogItem } from "@/lib/usage_catalog";
+import { getPlanUpgradeMessage } from "@/lib/plan_upgrade_messages";
 
 export default function PlanUpgradePanel({
   currentPlanCode,
@@ -15,6 +16,7 @@ export default function PlanUpgradePanel({
 
   const nextLocked = locked[0];
   const requiredPlan = getPlanCatalogItem(nextLocked.minimumPlan);
+  const upgradeMessage = getPlanUpgradeMessage(nextLocked.minimumPlan);
 
   return (
     <section className="border border-[#d9ded3] bg-white p-5">
@@ -25,13 +27,16 @@ export default function PlanUpgradePanel({
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f5d50]">
-              Upgrade
+              Next Step
             </p>
             <h2 className="mt-1 break-words text-xl font-bold">
-              {requiredPlan.name}で「{nextLocked.label}」を使えます
+              {upgradeMessage.headline}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#4b5563]">
-              {nextLocked.description}
+              次に使える機能: {nextLocked.label}。{nextLocked.description}
+            </p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#4b5563]">
+              {upgradeMessage.body}
             </p>
           </div>
         </div>
@@ -39,7 +44,7 @@ export default function PlanUpgradePanel({
           href="/usage"
           className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-bold text-[#2f5d50]"
         >
-          プランを見る
+          {requiredPlan.name}を見る
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
