@@ -8,10 +8,13 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
+import { getServerSession } from "next-auth";
 import {
   getEnterpriseContactFormUrl,
   getEnterpriseContactMailtoHref,
 } from "@/lib/enterprise_contact";
+import { authOptions } from "@/lib/auth_options";
+import { getCurrentOrganization } from "@/lib/current_organization";
 
 export const metadata: Metadata = {
   title: "導入相談",
@@ -36,8 +39,16 @@ const formFields = [
   "導入希望時期",
 ];
 
-export default function EnterpriseContactPage() {
-  const formUrl = getEnterpriseContactFormUrl();
+export default async function EnterpriseContactPage() {
+  const session = await getServerSession(authOptions);
+  const currentOrganization = session?.user?.id
+    ? await getCurrentOrganization(session.user.id)
+    : null;
+  const formUrl = getEnterpriseContactFormUrl({
+    companyName: currentOrganization?.organization_name,
+    email: session?.user?.email,
+    name: session?.user?.name,
+  });
   const mailtoHref = getEnterpriseContactMailtoHref();
 
   return (

@@ -1,5 +1,19 @@
 const defaultContactEmail = "info@morimori-labo.monster";
+const defaultContactFormUrl =
+  "https://docs.google.com/forms/d/e/1FAIpQLSeFxDtMVmjNXNBSzGCdXe4d4gz2dxV9JWAlkTPVhfvbpvPKuw/viewform?usp=publish-editor";
 const enterpriseContactPageHref = "/enterprise/contact";
+
+type EnterpriseContactPrefill = {
+  companyName?: string | null;
+  email?: string | null;
+  name?: string | null;
+};
+
+const googleFormEntries = {
+  companyName: "entry.1015888782",
+  name: "entry.1623621589",
+  email: "entry.701789915",
+};
 
 function extractEmail(value: string | undefined) {
   if (!value) {
@@ -17,14 +31,15 @@ export function getEnterpriseContactPageHref() {
   return enterpriseContactPageHref;
 }
 
-export function getEnterpriseContactFormUrl() {
+export function getEnterpriseContactFormUrl(prefill: EnterpriseContactPrefill = {}) {
   const explicitUrl =
     process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_FORM_URL?.trim() ||
     process.env.ENTERPRISE_CONTACT_FORM_URL?.trim() ||
     process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_URL?.trim() ||
-    process.env.ENTERPRISE_CONTACT_URL?.trim();
+    process.env.ENTERPRISE_CONTACT_URL?.trim() ||
+    defaultContactFormUrl;
   if (explicitUrl) {
-    return normalizeGoogleFormUrl(explicitUrl);
+    return buildGoogleFormUrl(explicitUrl, prefill);
   }
   return null;
 }
@@ -49,20 +64,45 @@ export function getEnterpriseContactMailtoHref() {
   return `mailto:${contactEmail}?subject=${subject}&body=${body}`;
 }
 
+function buildGoogleFormUrl(value: string, prefill: EnterpriseContactPrefill) {
+  const normalized = normalizeGoogleFormUrl(value);
+  try {
+    const url = new URL(normalized);
+    if (!isGoogleFormUrl(url)) {
+      return normalized;
+    }
+    addPrefill(url, googleFormEntries.companyName, prefill.companyName);
+    addPrefill(url, googleFormEntries.name, prefill.name);
+    addPrefill(url, googleFormEntries.email, prefill.email);
+    return url.toString();
+  } catch {
+    return normalized;
+  }
+}
+
+function addPrefill(url: URL, entryId: string, value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (trimmed) {
+    url.searchParams.set(entryId, trimmed);
+  }
+}
+
+function isGoogleFormUrl(url: URL) {
+  return url.hostname === "docs.google.com" && url.pathname.includes("/forms/");
+}
+
 function normalizeGoogleFormUrl(value: string) {
   try {
     const url = new URL(value);
     if (
-      url.hostname === "docs.google.com" &&
-      url.pathname.includes("/forms/") &&
+      isGoogleFormUrl(url) &&
       url.pathname.endsWith("/viewform")
     ) {
       url.searchParams.set("embedded", "true");
       return url.toString();
     }
     if (
-      url.hostname === "docs.google.com" &&
-      url.pathname.includes("/forms/") &&
+      isGoogleFormUrl(url) &&
       url.pathname.endsWith("/edit")
     ) {
       url.pathname = url.pathname.replace(/\/edit$/, "/viewform");
