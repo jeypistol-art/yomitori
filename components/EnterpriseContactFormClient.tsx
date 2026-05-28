@@ -2,11 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Loader2, Send } from "lucide-react";
-import type { EnterpriseContactFormEntries } from "@/lib/enterprise_contact";
 
 type EnterpriseContactFormClientProps = {
-  actionUrl: string;
-  entries: EnterpriseContactFormEntries;
   initialValues: {
     companyName: string;
     email: string;
@@ -49,7 +46,7 @@ const consultationTopicOptions = [
 const preferredContactOptions = [
   "メール",
   "オンライン面談",
-  "まずは資料がほしい",
+  "資料が欲しい",
 ];
 
 const desiredTimingOptions = [
@@ -60,8 +57,6 @@ const desiredTimingOptions = [
 ];
 
 export default function EnterpriseContactFormClient({
-  actionUrl,
-  entries,
   initialValues,
 }: EnterpriseContactFormClientProps) {
   const [topics, setTopics] = useState<string[]>([]);
@@ -77,18 +72,56 @@ export default function EnterpriseContactFormClient({
     );
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (topics.length === 0) {
-      event.preventDefault();
       setError("相談したい内容を1つ以上選択してください。");
       return;
     }
     setError("");
     setIsSubmitting(true);
-    window.setTimeout(() => {
-      setIsSubmitting(false);
+
+    const formData = new FormData(event.currentTarget);
+    const payload = {
+      companyName: String(formData.get("companyName") ?? ""),
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      industry: String(formData.get("industry") ?? ""),
+      managementScale: String(formData.get("managementScale") ?? ""),
+      monthlyDocuments: String(formData.get("monthlyDocuments") ?? ""),
+      consultationTopics: formData
+        .getAll("consultationTopics")
+        .map((value) => String(value)),
+      currentPain: String(formData.get("currentPain") ?? ""),
+      preferredContact: String(formData.get("preferredContact") ?? ""),
+      desiredTiming: String(formData.get("desiredTiming") ?? ""),
+    };
+
+    try {
+      const response = await fetch("/api/enterprise/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      if (!response.ok) {
+        setError(
+          result?.error ??
+            "送信に失敗しました。時間を置いて再度お試しください。"
+        );
+        return;
+      }
+      setTopics([]);
       setIsSubmitted(true);
-    }, 1200);
+    } catch {
+      setError("送信に失敗しました。ネットワーク接続を確認してください。");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (isSubmitted) {
@@ -114,30 +147,21 @@ export default function EnterpriseContactFormClient({
 
   return (
     <>
-      <iframe
-        aria-hidden="true"
-        className="hidden"
-        name="enterprise-contact-submit-frame"
-        title="送信処理"
-      />
       <form
-        action={actionUrl}
         className="space-y-6 p-5"
-        method="POST"
         onSubmit={handleSubmit}
-        target="enterprise-contact-submit-frame"
       >
         <div className="grid gap-4 md:grid-cols-2">
           <TextField
             defaultValue={initialValues.companyName}
             label="会社名・屋号"
-            name={entries.companyName}
+            name="companyName"
             required
           />
           <TextField
             defaultValue={initialValues.name}
             label="お名前"
-            name={entries.name}
+            name="name"
             required
           />
         </div>
@@ -145,7 +169,7 @@ export default function EnterpriseContactFormClient({
         <TextField
           defaultValue={initialValues.email}
           label="メールアドレス"
-          name={entries.email}
+          name="email"
           required
           type="email"
         />
@@ -153,19 +177,19 @@ export default function EnterpriseContactFormClient({
         <div className="grid gap-4 md:grid-cols-3">
           <SelectField
             label="業種"
-            name={entries.industry}
+            name="industry"
             options={industryOptions}
             required
           />
           <SelectField
             label="管理対象の規模"
-            name={entries.managementScale}
+            name="managementScale"
             options={managementScaleOptions}
             required
           />
           <SelectField
             label="毎月扱う書類数"
-            name={entries.monthlyDocuments}
+            name="monthlyDocuments"
             options={monthlyDocumentOptions}
             required
           />
@@ -184,7 +208,7 @@ export default function EnterpriseContactFormClient({
                 <input
                   checked={topics.includes(topic)}
                   className="h-4 w-4"
-                  name={entries.consultationTopics}
+                  name="consultationTopics"
                   onChange={() => toggleTopic(topic)}
                   type="checkbox"
                   value={topic}
@@ -197,7 +221,7 @@ export default function EnterpriseContactFormClient({
 
         <TextAreaField
           label="現在困っていること"
-          name={entries.currentPain}
+          name="currentPain"
           placeholder="例: 期限の見落とし、担当者への引き継ぎ、監査ログ、書類分類、拠点別管理など"
           rows={5}
         />
@@ -205,12 +229,12 @@ export default function EnterpriseContactFormClient({
         <div className="grid gap-4 md:grid-cols-2">
           <SelectField
             label="希望する連絡方法"
-            name={entries.preferredContact}
+            name="preferredContact"
             options={preferredContactOptions}
           />
           <SelectField
             label="希望時期"
-            name={entries.desiredTiming}
+            name="desiredTiming"
             options={desiredTimingOptions}
           />
         </div>

@@ -9,11 +9,7 @@ import {
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import EnterpriseContactFormClient from "@/components/EnterpriseContactFormClient";
-import {
-  enterpriseContactFormEntries,
-  getEnterpriseContactFormActionUrl,
-  getEnterpriseContactMailtoHref,
-} from "@/lib/enterprise_contact";
+import { getEnterpriseContactMailtoHref } from "@/lib/enterprise_contact";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
 
@@ -45,7 +41,6 @@ export default async function EnterpriseContactPage() {
   const currentOrganization = session?.user?.id
     ? await getCurrentOrganization(session.user.id)
     : null;
-  const formActionUrl = getEnterpriseContactFormActionUrl();
   const mailtoHref = getEnterpriseContactMailtoHref();
 
   return (
@@ -141,8 +136,6 @@ export default async function EnterpriseContactPage() {
               <h2 className="mt-1 text-xl font-bold">Enterprise導入相談フォーム</h2>
             </div>
             <EnterpriseContactFormClient
-              actionUrl={formActionUrl}
-              entries={enterpriseContactFormEntries}
               initialValues={{
                 companyName: currentOrganization?.organization_name ?? "",
                 email: session?.user?.email ?? "",
