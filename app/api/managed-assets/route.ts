@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, hasDbCode, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import {
   assertManagedAssetBelongsToOrganization,
   normalizeAssetType,
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
     requireAdminWrite(currentOrganization);
+    requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
 
     const body = await readJson(request);
     const parentId = normalizeNullableText(body.parent_id);

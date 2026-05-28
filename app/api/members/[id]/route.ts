@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import { requireAdminWrite } from "@/lib/permissions";
 
 type RouteContext = {
@@ -13,6 +14,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
     requireAdminWrite(currentOrganization);
+    requireFeatureAccess(currentOrganization.plan_code, "team_members");
 
     if (id === currentOrganization.member_id) {
       throw new ApiError(400, "cannot delete current member");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import { requireOperationalWrite } from "@/lib/permissions";
 
 type RouteContext = {
@@ -204,6 +205,15 @@ export async function POST(request: Request, context: RouteContext) {
     const requiredActions = asArray(draft.required_actions);
     const requiredDocuments = asArray(draft.required_documents);
     const risks = asArray(draft.risks_and_notes);
+    const taskCandidates =
+      body.create_tasks === false ? [] : getTaskCandidates(draft);
+    const hasTeamAssignee = taskCandidates.some((task) => {
+      const assigneeId = normalizeText(task.assignee_member_id);
+      return Boolean(assigneeId && assigneeId !== currentOrganization.member_id);
+    });
+    if (hasTeamAssignee) {
+      requireFeatureAccess(currentOrganization.plan_code, "assignee_workflow");
+    }
     const extractionId =
       normalizeText(asRecord(document.rows[0].metadata).latest_extraction_id) ?? null;
 
@@ -268,7 +278,7 @@ export async function POST(request: Request, context: RouteContext) {
     const createdTasks: Array<{ id: string; title: string }> = [];
     const fallbackDueDate = extractPrimaryDueDate(draft);
     if (body.create_tasks !== false) {
-      for (const task of getTaskCandidates(draft)) {
+      for (const task of taskCandidates) {
         if (task.create_by_default === false) {
           continue;
         }

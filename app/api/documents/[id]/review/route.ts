@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import {
   assertManagedAssetBelongsToOrganization,
 } from "@/lib/master_data";
@@ -268,6 +269,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     let managedAssetIds: string[] | null = null;
     if (hasManagedAssetIds) {
+      requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
       managedAssetIds = normalizeIdList(body.managed_asset_ids);
       for (const managedAssetId of managedAssetIds) {
         const exists = await assertManagedAssetBelongsToOrganization(

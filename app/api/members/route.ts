@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import { normalizeNullableText } from "@/lib/master_data";
 import { requireAdminWrite } from "@/lib/permissions";
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
     requireAdminWrite(currentOrganization);
+    requireFeatureAccess(currentOrganization.plan_code, "team_members");
 
     const body = (await request.json().catch(() => ({}))) as {
       email?: unknown;

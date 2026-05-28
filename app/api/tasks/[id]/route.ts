@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import { normalizeNullableText } from "@/lib/master_data";
 import { requireOperationalWrite, requireTaskDelete } from "@/lib/permissions";
 
@@ -100,11 +101,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     const status = "status" in body ? normalizeStatus(body.status) : undefined;
     const priority = "priority" in body ? normalizePriority(body.priority) : undefined;
     const dueDate = "due_date" in body ? normalizeDate(body.due_date) : undefined;
+    const requestedAssigneeMemberId = normalizeNullableText(body.assignee_member_id);
+    if (
+      "assignee_member_id" in body &&
+      requestedAssigneeMemberId &&
+      requestedAssigneeMemberId !== currentOrganization.member_id
+    ) {
+      requireFeatureAccess(currentOrganization.plan_code, "assignee_workflow");
+    }
     const assigneeMemberId =
       "assignee_member_id" in body
         ? await assertMember(
             currentOrganization.organization_id,
-            normalizeNullableText(body.assignee_member_id)
+            requestedAssigneeMemberId
           )
         : undefined;
 

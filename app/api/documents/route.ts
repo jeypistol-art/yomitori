@@ -4,6 +4,7 @@ import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { requireBillingAccess } from "@/lib/billing_access";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import {
   assertCounterpartyBelongsToOrganization,
   assertManagedAssetBelongsToOrganization,
@@ -205,6 +206,9 @@ export async function POST(request: Request) {
     }
 
     const counterpartyId = normalizeNullableText(formData.get("counterparty_id"));
+    if (counterpartyId) {
+      requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
+    }
     if (
       counterpartyId &&
       !(await assertCounterpartyBelongsToOrganization(
@@ -216,6 +220,9 @@ export async function POST(request: Request) {
     }
 
     const managedAssetIds = getManagedAssetIds(formData);
+    if (managedAssetIds.length > 0) {
+      requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
+    }
     for (const managedAssetId of managedAssetIds) {
       const exists = await assertManagedAssetBelongsToOrganization(
         currentOrganization.organization_id,

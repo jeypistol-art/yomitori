@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api_errors";
 import { getPlanCatalogItem, PLAN_CATALOG } from "@/lib/usage_catalog";
 
 export type PlanCode = "personal" | "business" | "pro" | "enterprise";
@@ -168,6 +169,22 @@ export function canUseFeature(planCode: string, featureKey: FeatureKey) {
     return false;
   }
   return PLAN_RANK[plan] >= PLAN_RANK[feature.minimumPlan];
+}
+
+export function requireFeatureAccess(planCode: string, featureKey: FeatureKey) {
+  const feature = FEATURE_GATES.find((item) => item.key === featureKey);
+  if (!feature) {
+    throw new ApiError(500, `Unknown feature gate: ${featureKey}`);
+  }
+  if (canUseFeature(planCode, featureKey)) {
+    return feature;
+  }
+
+  const requiredPlan = getPlanCatalogItem(feature.minimumPlan);
+  throw new ApiError(
+    402,
+    `${feature.label}は${requiredPlan.name}プラン以上で利用できます。`
+  );
 }
 
 export function getFeatureAvailability(planCode: string): FeatureAvailability[] {

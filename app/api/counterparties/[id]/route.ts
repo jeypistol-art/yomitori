@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import {
   normalizeCounterpartyType,
   normalizeNullableText,
@@ -39,6 +40,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
     requireAdminWrite(currentOrganization);
+    requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
 
     const body = await readJson(request);
     const result = await query<CounterpartyRow>(
@@ -94,6 +96,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { currentOrganization } = await requireApiContext();
     requireAdminWrite(currentOrganization);
+    requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
 
     const result = await query<{ id: string }>(
       `UPDATE counterparties

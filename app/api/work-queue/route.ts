@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 
 type PendingDocumentRow = {
   id: string;
@@ -48,6 +49,7 @@ type QueueStatsRow = {
 export async function GET() {
   try {
     const { currentOrganization } = await requireApiContext();
+    requireFeatureAccess(currentOrganization.plan_code, "monthly_work_queue");
     const organizationId = currentOrganization.organization_id;
 
     const [documents, tasks, stats] = await Promise.all([

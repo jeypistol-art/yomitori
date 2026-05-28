@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
+import { requireFeatureAccess } from "@/lib/feature_gates";
 import { requireAuditRead } from "@/lib/permissions";
 
 type AuditLogRow = {
@@ -34,6 +35,7 @@ export async function GET(request: Request) {
   try {
     const { currentOrganization } = await requireApiContext();
     requireAuditRead(currentOrganization);
+    requireFeatureAccess(currentOrganization.plan_code, "audit_logs");
 
     const { searchParams } = new URL(request.url);
     const action = normalizeFilter(searchParams.get("action"));
