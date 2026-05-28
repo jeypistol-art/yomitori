@@ -69,6 +69,9 @@ export async function POST(request: Request) {
     const email = normalizeEmail(body.email);
     const name = normalizeNullableText(body.name);
     const role = normalizeRole(body.role);
+    if (role !== "member") {
+      requireFeatureAccess(currentOrganization.plan_code, "advanced_permissions");
+    }
 
     const user = await query<{ id: string }>(
       `INSERT INTO users (

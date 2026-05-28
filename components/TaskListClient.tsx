@@ -90,12 +90,14 @@ function getDueTone(task: TaskItem) {
 }
 
 type TaskListClientProps = {
+  canAssignTeamTasks: boolean;
   initialAssigneeFilter?: string;
   initialDueFilter?: string;
   initialStatusFilter?: string;
 };
 
 export default function TaskListClient({
+  canAssignTeamTasks,
   initialAssigneeFilter = "all",
   initialDueFilter = "all",
   initialStatusFilter = "active",
@@ -127,7 +129,7 @@ export default function TaskListClient({
       const params = new URLSearchParams();
       params.set("status", apiStatusFilter);
       params.set("due", dueFilter);
-      params.set("assignee", assigneeFilter);
+      params.set("assignee", canAssignTeamTasks ? assigneeFilter : "all");
       const [taskPayload, memberPayload] = await Promise.all([
         fetchJson<ApiList<TaskItem>>(`/api/tasks?${params.toString()}`),
         fetchJson<ApiList<Member>>("/api/members"),
@@ -145,7 +147,7 @@ export default function TaskListClient({
     } finally {
       setIsLoading(false);
     }
-  }, [apiStatusFilter, dueFilter, assigneeFilter, statusFilter]);
+  }, [apiStatusFilter, assigneeFilter, canAssignTeamTasks, dueFilter, statusFilter]);
 
   useEffect(() => {
     void loadAll();
@@ -261,22 +263,31 @@ export default function TaskListClient({
               <option value="none">期限なし</option>
             </select>
           </label>
-          <label className="block">
-            <span className="text-xs font-bold text-[#4b5563]">担当者</span>
-            <select
-              value={assigneeFilter}
-              onChange={(event) => setAssigneeFilter(event.target.value)}
-              className="mt-1 h-10 rounded-md border border-[#cfd6ca] bg-white px-3 text-sm"
-            >
-              <option value="all">すべて</option>
-              <option value="unassigned">未設定</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name ?? member.email}
-                </option>
-              ))}
-            </select>
-          </label>
+          {canAssignTeamTasks ? (
+            <label className="block">
+              <span className="text-xs font-bold text-[#4b5563]">担当者</span>
+              <select
+                value={assigneeFilter}
+                onChange={(event) => setAssigneeFilter(event.target.value)}
+                className="mt-1 h-10 rounded-md border border-[#cfd6ca] bg-white px-3 text-sm"
+              >
+                <option value="all">すべて</option>
+                <option value="unassigned">未設定</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name ?? member.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="block">
+              <span className="text-xs font-bold text-[#4b5563]">担当者</span>
+              <div className="mt-1 flex h-10 items-center rounded-md border border-[#cfd6ca] bg-[#f4f5f1] px-3 text-sm font-semibold text-[#6b7280]">
+                Business以上で利用可能
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => void loadAll()}
@@ -369,23 +380,29 @@ export default function TaskListClient({
                             </option>
                           ))}
                         </select>
-                        <select
-                          value={editForm.assignee_member_id}
-                          onChange={(event) =>
-                            setEditForm((current) => ({
-                              ...current,
-                              assignee_member_id: event.target.value,
-                            }))
-                          }
-                          className="h-10 border border-[#d9ded3] bg-white px-3 text-sm"
-                        >
-                          <option value="">未設定</option>
-                          {members.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.name ?? member.email}
-                            </option>
-                          ))}
-                        </select>
+                        {canAssignTeamTasks ? (
+                          <select
+                            value={editForm.assignee_member_id}
+                            onChange={(event) =>
+                              setEditForm((current) => ({
+                                ...current,
+                                assignee_member_id: event.target.value,
+                              }))
+                            }
+                            className="h-10 border border-[#d9ded3] bg-white px-3 text-sm"
+                          >
+                            <option value="">未設定</option>
+                            {members.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.name ?? member.email}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex h-10 items-center border border-[#d9ded3] bg-[#f4f5f1] px-3 text-sm text-[#6b7280]">
+                            担当者割当はBusiness以上
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-wrap justify-end gap-2">
                         <button
@@ -404,7 +421,9 @@ export default function TaskListClient({
                               description: editForm.description,
                               due_date: editForm.due_date,
                               priority: editForm.priority,
-                              assignee_member_id: editForm.assignee_member_id,
+                              ...(canAssignTeamTasks
+                                ? { assignee_member_id: editForm.assignee_member_id }
+                                : {}),
                             })
                           }
                           className="inline-flex h-9 items-center gap-2 rounded-md bg-[#2f5d50] px-3 text-sm font-bold text-white disabled:opacity-60"

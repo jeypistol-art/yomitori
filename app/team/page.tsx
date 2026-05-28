@@ -7,6 +7,7 @@ import TeamMembersClient from "@/components/TeamMembersClient";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export const metadata: Metadata = {
   title: "担当者設定",
@@ -22,6 +23,14 @@ export default async function TeamPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canManageTeam = canUseFeature(
+    currentOrganization.plan_code,
+    "team_members"
+  );
+  const canManagePermissions = canUseFeature(
+    currentOrganization.plan_code,
+    "advanced_permissions"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -53,7 +62,9 @@ export default async function TeamPage() {
             currentPlanCode={currentOrganization.plan_code}
             featureKey="team_members"
           />
-          <TeamMembersClient />
+          {canManageTeam ? (
+            <TeamMembersClient canManagePermissions={canManagePermissions} />
+          ) : null}
         </div>
       </div>
     </main>

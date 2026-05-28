@@ -7,6 +7,7 @@ import AuditLogsClient from "@/components/AuditLogsClient";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export const metadata: Metadata = {
   title: "監査ログ",
@@ -22,6 +23,10 @@ export default async function AuditLogsPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canReadAuditLogs = canUseFeature(
+    currentOrganization.plan_code,
+    "audit_logs"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -51,7 +56,7 @@ export default async function AuditLogsPage() {
             currentPlanCode={currentOrganization.plan_code}
             featureKey="audit_logs"
           />
-          <AuditLogsClient />
+          {canReadAuditLogs ? <AuditLogsClient /> : null}
         </div>
       </div>
     </main>

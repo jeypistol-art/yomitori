@@ -3,9 +3,11 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import FeatureGateNotice from "@/components/FeatureGateNotice";
 import MasterDataClient from "@/components/MasterDataClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export const metadata: Metadata = {
   title: "台帳設定",
@@ -21,6 +23,10 @@ export default async function MasterDataPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canUseSharedLedger = canUseFeature(
+    currentOrganization.plan_code,
+    "shared_ledger"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -47,7 +53,13 @@ export default async function MasterDataPage() {
           </div>
         </header>
 
-        <MasterDataClient />
+        <div className="space-y-5">
+          <FeatureGateNotice
+            currentPlanCode={currentOrganization.plan_code}
+            featureKey="shared_ledger"
+          />
+          {canUseSharedLedger ? <MasterDataClient /> : null}
+        </div>
       </div>
     </main>
   );

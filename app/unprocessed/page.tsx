@@ -3,9 +3,11 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import FeatureGateNotice from "@/components/FeatureGateNotice";
 import UnprocessedQueueClient from "@/components/UnprocessedQueueClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export const metadata: Metadata = {
   title: "未処理一覧",
@@ -21,6 +23,10 @@ export default async function UnprocessedPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canUseWorkQueue = canUseFeature(
+    currentOrganization.plan_code,
+    "monthly_work_queue"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -45,7 +51,13 @@ export default async function UnprocessedPage() {
           </div>
         </header>
 
-        <UnprocessedQueueClient />
+        <div className="space-y-5">
+          <FeatureGateNotice
+            currentPlanCode={currentOrganization.plan_code}
+            featureKey="monthly_work_queue"
+          />
+          {canUseWorkQueue ? <UnprocessedQueueClient /> : null}
+        </div>
       </div>
     </main>
   );

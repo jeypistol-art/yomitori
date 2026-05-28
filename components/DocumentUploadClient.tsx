@@ -104,7 +104,11 @@ function formatFileSize(size: number) {
   return `${Math.max(1, Math.round(size / 1024))} KB`;
 }
 
-export default function DocumentUploadClient() {
+export default function DocumentUploadClient({
+  canUseSharedLedger,
+}: {
+  canUseSharedLedger: boolean;
+}) {
   const [assets, setAssets] = useState<ManagedAsset[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -130,21 +134,31 @@ export default function DocumentUploadClient() {
     setError("");
     setIsLimitError(false);
     try {
-      const [assetPayload, counterpartyPayload, documentPayload] =
-        await Promise.all([
-          fetchJson<ApiList<ManagedAsset>>("/api/managed-assets"),
-          fetchJson<ApiList<Counterparty>>("/api/counterparties"),
-          fetchJson<ApiList<DocumentItem>>("/api/documents"),
-        ]);
-      setAssets(assetPayload.data);
-      setCounterparties(counterpartyPayload.data);
-      setDocuments(documentPayload.data);
+      const documentPromise = fetchJson<ApiList<DocumentItem>>("/api/documents");
+      if (canUseSharedLedger) {
+        const [assetPayload, counterpartyPayload, documentPayload] =
+          await Promise.all([
+            fetchJson<ApiList<ManagedAsset>>("/api/managed-assets"),
+            fetchJson<ApiList<Counterparty>>("/api/counterparties"),
+            documentPromise,
+          ]);
+        setAssets(assetPayload.data);
+        setCounterparties(counterpartyPayload.data);
+        setDocuments(documentPayload.data);
+      } else {
+        const documentPayload = await documentPromise;
+        setAssets([]);
+        setCounterparties([]);
+        setCounterpartyId("");
+        setSelectedAssetIds([]);
+        setDocuments(documentPayload.data);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [canUseSharedLedger]);
 
   useEffect(() => {
     void loadAll();
@@ -179,9 +193,11 @@ export default function DocumentUploadClient() {
     try {
       const formData = new FormData();
       formData.set("title", title);
-      formData.set("counterparty_id", counterpartyId);
+      formData.set("counterparty_id", canUseSharedLedger ? counterpartyId : "");
       formData.set("source_text", sourceText);
-      selectedAssetIds.forEach((id) => formData.append("managed_asset_ids", id));
+      if (canUseSharedLedger) {
+        selectedAssetIds.forEach((id) => formData.append("managed_asset_ids", id));
+      }
       files.forEach((file) => formData.append("files", file));
 
       const payload = await fetchJson<UploadResponse>("/api/documents", {
@@ -264,63 +280,77 @@ export default function DocumentUploadClient() {
             />
           </label>
 
-          <label className="block text-sm font-semibold">
-            取引先
-            <select
-              value={counterpartyId}
-              onChange={(event) => setCounterpartyId(event.target.value)}
-              className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
-            >
-              <option value="">未選択</option>
-              {counterparties.map((counterparty) => (
-                <option key={counterparty.id} value={counterparty.id}>
-                  {counterparty.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {canUseSharedLedger ? (
+            <>
+              <label className="block text-sm font-semibold">
+                取引先
+                <select
+                  value={counterpartyId}
+                  onChange={(event) => setCounterpartyId(event.target.value)}
+                  className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
+                >
+                  <option value="">未選択</option>
+                  {counterparties.map((counterparty) => (
+                    <option key={counterparty.id} value={counterparty.id}>
+                      {counterparty.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold">管理対象</p>
-              <Link
-                href="/master-data"
-                className="text-xs font-bold text-[#2f5d50]"
-              >
-                台帳設定
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">管理対象</p>
+                  <Link
+                    href="/master-data"
+                    className="text-xs font-bold text-[#2f5d50]"
+                  >
+                    台帳設定
+                  </Link>
+                </div>
+                {assets.length === 0 ? (
+                  <div className="border border-dashed border-[#cfd6ca] px-3 py-5 text-center text-sm text-[#5f6b5f]">
+                    管理対象は未登録です
+                  </div>
+                ) : (
+                  <div className="max-h-44 space-y-2 overflow-auto border border-[#e1e6dc] p-2">
+                    {assets.map((asset) => (
+                      <label
+                        key={asset.id}
+                        className="flex cursor-pointer items-start gap-3 rounded px-2 py-2 hover:bg-[#f7f8f5]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedAssetIds.includes(asset.id)}
+                          onChange={() => toggleAsset(asset.id)}
+                          className="mt-1 h-4 w-4"
+                        />
+                        <span className="min-w-0">
+                          <span className="block break-words text-sm font-bold">
+                            {asset.name}
+                          </span>
+                          <span className="mt-1 block text-xs text-[#6b7280]">
+                            {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
+                            {asset.code ? ` / ${asset.code}` : ""}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="border border-[#e1e6dc] bg-[#f4f5f1] px-4 py-3 text-sm leading-6 text-[#5f6b5f]">
+              <p className="font-bold text-[#4b5563]">取引先・管理対象の紐づけ</p>
+              <p className="mt-1">
+                共有台帳はBusinessプラン以上で利用できます。このプランでは書類本文とファイルのみ登録できます。
+              </p>
+              <Link href="/usage" className="mt-2 inline-flex font-bold text-[#2f5d50]">
+                プランを見る
               </Link>
             </div>
-            {assets.length === 0 ? (
-              <div className="border border-dashed border-[#cfd6ca] px-3 py-5 text-center text-sm text-[#5f6b5f]">
-                管理対象は未登録です
-              </div>
-            ) : (
-              <div className="max-h-44 space-y-2 overflow-auto border border-[#e1e6dc] p-2">
-                {assets.map((asset) => (
-                  <label
-                    key={asset.id}
-                    className="flex cursor-pointer items-start gap-3 rounded px-2 py-2 hover:bg-[#f7f8f5]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedAssetIds.includes(asset.id)}
-                      onChange={() => toggleAsset(asset.id)}
-                      className="mt-1 h-4 w-4"
-                    />
-                    <span className="min-w-0">
-                      <span className="block break-words text-sm font-bold">
-                        {asset.name}
-                      </span>
-                      <span className="mt-1 block text-xs text-[#6b7280]">
-                        {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
-                        {asset.code ? ` / ${asset.code}` : ""}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold">

@@ -39,7 +39,11 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-export default function TeamMembersClient() {
+export default function TeamMembersClient({
+  canManagePermissions,
+}: {
+  canManagePermissions: boolean;
+}) {
   const [members, setMembers] = useState<Member[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -130,13 +134,25 @@ export default function TeamMembersClient() {
             権限
             <select
               value={role}
-              onChange={(event) => setRole(event.target.value)}
-              className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
+              onChange={(event) =>
+                setRole(canManagePermissions ? event.target.value : "member")
+              }
+              disabled={!canManagePermissions}
+              className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3 disabled:bg-[#f4f5f1] disabled:text-[#6b7280]"
             >
               <option value="member">担当者</option>
-              <option value="admin">管理者</option>
-              <option value="viewer">閲覧</option>
+              {canManagePermissions ? (
+                <>
+                  <option value="admin">管理者</option>
+                  <option value="viewer">閲覧</option>
+                </>
+              ) : null}
             </select>
+            {!canManagePermissions ? (
+              <span className="mt-2 block text-xs leading-5 text-[#6b7280]">
+                権限管理はProプラン以上で利用できます。Businessでは担当者として登録されます。
+              </span>
+            ) : null}
           </label>
           <button
             type="button"

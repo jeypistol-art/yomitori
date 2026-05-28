@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import TaskListClient from "@/components/TaskListClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export const metadata: Metadata = {
   title: "タスク一覧",
@@ -45,6 +46,10 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canAssignTeamTasks = canUseFeature(
+    currentOrganization.plan_code,
+    "assignee_workflow"
+  );
 
   const resolvedSearchParams = await searchParams;
   const initialDueFilter = normalizeFilter(
@@ -85,6 +90,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         </header>
 
         <TaskListClient
+          canAssignTeamTasks={canAssignTeamTasks}
           initialAssigneeFilter={initialAssigneeFilter}
           initialDueFilter={initialDueFilter}
           initialStatusFilter={initialStatusFilter}

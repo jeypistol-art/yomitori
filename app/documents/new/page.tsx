@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import DocumentUploadClient from "@/components/DocumentUploadClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export const metadata: Metadata = {
   title: "書類登録",
@@ -21,6 +22,10 @@ export default async function NewDocumentPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canUseSharedLedger = canUseFeature(
+    currentOrganization.plan_code,
+    "shared_ledger"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -47,7 +52,7 @@ export default async function NewDocumentPage() {
           </div>
         </header>
 
-        <DocumentUploadClient />
+        <DocumentUploadClient canUseSharedLedger={canUseSharedLedger} />
       </div>
     </main>
   );

@@ -192,6 +192,20 @@ function buildInitialDraft(payload: ReviewPayload): JsonRecord {
   return draft;
 }
 
+function stripTeamAssignees(draft: JsonRecord): JsonRecord {
+  const next = { ...draft };
+  for (const key of ["task_candidates", "required_actions"]) {
+    const items = asArray(next[key]);
+    if (items.length > 0) {
+      next[key] = items.map((item) => ({
+        ...item,
+        assignee_member_id: "",
+      }));
+    }
+  }
+  return next;
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -257,7 +271,17 @@ function DraftTextArea({
   );
 }
 
-export default function DocumentReviewClient({ documentId }: { documentId: string }) {
+type DocumentReviewClientProps = {
+  canAssignTeamTasks: boolean;
+  canUseSharedLedger: boolean;
+  documentId: string;
+};
+
+export default function DocumentReviewClient({
+  canAssignTeamTasks,
+  canUseSharedLedger,
+  documentId,
+}: DocumentReviewClientProps) {
   const [payload, setPayload] = useState<ReviewPayload | null>(null);
   const [draft, setDraft] = useState<JsonRecord>({});
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -361,6 +385,9 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   }
 
   function toggleAsset(id: string) {
+    if (!canUseSharedLedger) {
+      return;
+    }
     setSelectedAssetIds((current) =>
       current.includes(id)
         ? current.filter((currentId) => currentId !== id)
@@ -369,6 +396,10 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   }
 
   async function saveManagedAssets() {
+    if (!canUseSharedLedger) {
+      setError("共有台帳はBusinessプラン以上で利用できます。");
+      return;
+    }
     setIsSaving(true);
     setError("");
     setMessage("");
@@ -387,13 +418,14 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   }
 
   async function saveDraft() {
+    const submittedDraft = canAssignTeamTasks ? draft : stripTeamAssignees(draft);
     setIsSaving(true);
     setError("");
     setMessage("");
     try {
       await fetchJson(`/api/documents/${documentId}/review`, {
         method: "PATCH",
-        body: JSON.stringify({ draft }),
+        body: JSON.stringify({ draft: submittedDraft }),
       });
       setMessage("下書きを保存しました");
       await loadReview();
@@ -405,6 +437,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
   }
 
   async function approveDocument() {
+    const submittedDraft = canAssignTeamTasks ? draft : stripTeamAssignees(draft);
     setIsApproving(true);
     setError("");
     setMessage("");
@@ -414,7 +447,7 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
         ApiItem<{ document: { status: string }; created_tasks: Array<{ id: string; title: string }> }>
       >(`/api/documents/${documentId}/approve`, {
         method: "POST",
-        body: JSON.stringify({ draft, create_tasks: true }),
+        body: JSON.stringify({ draft: submittedDraft, create_tasks: true }),
       });
       setCreatedTasks(result.data.created_tasks);
       setMessage(
@@ -759,14 +792,21 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
               <button
                 type="button"
                 onClick={() => void saveManagedAssets()}
-                disabled={isSaving}
+                disabled={isSaving || !canUseSharedLedger}
                 className="rounded-md border border-[#d9ded3] px-3 py-2 text-sm font-bold text-[#2f5d50] disabled:opacity-60"
               >
                 保存
               </button>
             </div>
             <div className="mt-3">
-              {payload.managed_assets.length === 0 ? (
+              {!canUseSharedLedger ? (
+                <div className="border border-[#e1e6dc] bg-[#f4f5f1] px-3 py-4 text-sm leading-6 text-[#5f6b5f]">
+                  共有台帳への紐づけはBusinessプラン以上で利用できます。
+                  <Link href="/usage" className="ml-2 font-bold text-[#2f5d50]">
+                    プランを見る
+                  </Link>
+                </div>
+              ) : payload.managed_assets.length === 0 ? (
                 <div className="border border-dashed border-[#cfd6ca] px-3 py-5 text-center text-sm text-[#5f6b5f]">
                   管理対象は未登録です
                 </div>
@@ -1008,31 +1048,43 @@ export default function DocumentReviewClient({ documentId }: { documentId: strin
                       <label className="block">
                         <span className="flex h-4 items-center justify-between gap-2 text-xs font-bold leading-4 text-[#4b5563]">
                           担当者
-                          <a href="/team" className="text-[#2f5d50]">
-                            担当者設定
-                          </a>
+                          {canAssignTeamTasks ? (
+                            <a href="/team" className="text-[#2f5d50]">
+                              担当者設定
+                            </a>
+                          ) : (
+                            <Link href="/usage" className="text-[#2f5d50]">
+                              Business以上
+                            </Link>
+                          )}
                         </span>
-                        <select
-                          value={asString(task.assignee_member_id)}
-                          onChange={(event) =>
-                            updateArrayItem(
-                              asArray(draft.task_candidates).length
-                                ? "task_candidates"
-                                : "required_actions",
-                              index,
-                              "assignee_member_id",
-                              event.target.value
-                            )
-                          }
-                          className="mt-1 h-10 w-full border border-[#d9ded3] bg-white px-3 text-sm outline-none focus:border-[#2f5d50]"
-                        >
-                          <option value="">未設定</option>
-                          {payload.members.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.name ?? member.email}
-                            </option>
-                          ))}
-                        </select>
+                        {canAssignTeamTasks ? (
+                          <select
+                            value={asString(task.assignee_member_id)}
+                            onChange={(event) =>
+                              updateArrayItem(
+                                asArray(draft.task_candidates).length
+                                  ? "task_candidates"
+                                  : "required_actions",
+                                index,
+                                "assignee_member_id",
+                                event.target.value
+                              )
+                            }
+                            className="mt-1 h-10 w-full border border-[#d9ded3] bg-white px-3 text-sm outline-none focus:border-[#2f5d50]"
+                          >
+                            <option value="">未設定</option>
+                            {payload.members.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.name ?? member.email}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="mt-1 flex h-10 items-center border border-[#d9ded3] bg-[#f4f5f1] px-3 text-sm text-[#6b7280]">
+                            担当者割当はBusinessプラン以上
+                          </div>
+                        )}
                       </label>
                     </div>
                   </div>

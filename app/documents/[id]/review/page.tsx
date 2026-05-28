@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import DocumentReviewClient from "@/components/DocumentReviewClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -27,6 +28,14 @@ export default async function DocumentReviewPage({ params }: PageProps) {
   }
 
   const { id } = await params;
+  const canUseSharedLedger = canUseFeature(
+    currentOrganization.plan_code,
+    "shared_ledger"
+  );
+  const canAssignTeamTasks = canUseFeature(
+    currentOrganization.plan_code,
+    "assignee_workflow"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-5 text-[#1f2933] sm:px-6 lg:px-8">
@@ -53,7 +62,11 @@ export default async function DocumentReviewPage({ params }: PageProps) {
           </div>
         </header>
 
-        <DocumentReviewClient documentId={id} />
+        <DocumentReviewClient
+          canAssignTeamTasks={canAssignTeamTasks}
+          canUseSharedLedger={canUseSharedLedger}
+          documentId={id}
+        />
       </div>
     </main>
   );
