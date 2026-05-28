@@ -3,17 +3,20 @@ const defaultContactFormUrl =
   "https://docs.google.com/forms/d/e/1FAIpQLSeFxDtMVmjNXNBSzGCdXe4d4gz2dxV9JWAlkTPVhfvbpvPKuw/viewform?usp=publish-editor";
 const enterpriseContactPageHref = "/enterprise/contact";
 
-type EnterpriseContactPrefill = {
-  companyName?: string | null;
-  email?: string | null;
-  name?: string | null;
-};
-
-const googleFormEntries = {
+export const enterpriseContactFormEntries = {
   companyName: "entry.1015888782",
   name: "entry.1623621589",
   email: "entry.701789915",
+  industry: "entry.225021138",
+  managementScale: "entry.1068659254",
+  monthlyDocuments: "entry.1568853063",
+  consultationTopics: "entry.410062933",
+  currentPain: "entry.947243090",
+  preferredContact: "entry.1611145614",
+  desiredTiming: "entry.1547328506",
 };
+
+export type EnterpriseContactFormEntries = typeof enterpriseContactFormEntries;
 
 function extractEmail(value: string | undefined) {
   if (!value) {
@@ -31,17 +34,24 @@ export function getEnterpriseContactPageHref() {
   return enterpriseContactPageHref;
 }
 
-export function getEnterpriseContactFormUrl(prefill: EnterpriseContactPrefill = {}) {
-  const explicitUrl =
+function getEnterpriseContactSourceUrl() {
+  return (
     process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_FORM_URL?.trim() ||
     process.env.ENTERPRISE_CONTACT_FORM_URL?.trim() ||
     process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_URL?.trim() ||
     process.env.ENTERPRISE_CONTACT_URL?.trim() ||
-    defaultContactFormUrl;
-  if (explicitUrl) {
-    return buildGoogleFormUrl(explicitUrl, prefill);
-  }
-  return null;
+    defaultContactFormUrl
+  );
+}
+
+export function getEnterpriseContactFormActionUrl() {
+  return normalizeGoogleFormActionUrl(getEnterpriseContactSourceUrl());
+}
+
+export function getEnterpriseContactFormUrl() {
+  const explicitUrl =
+    getEnterpriseContactSourceUrl();
+  return normalizeGoogleFormUrl(explicitUrl);
 }
 
 export function getEnterpriseContactMailtoHref() {
@@ -64,31 +74,30 @@ export function getEnterpriseContactMailtoHref() {
   return `mailto:${contactEmail}?subject=${subject}&body=${body}`;
 }
 
-function buildGoogleFormUrl(value: string, prefill: EnterpriseContactPrefill) {
-  const normalized = normalizeGoogleFormUrl(value);
-  try {
-    const url = new URL(normalized);
-    if (!isGoogleFormUrl(url)) {
-      return normalized;
-    }
-    addPrefill(url, googleFormEntries.companyName, prefill.companyName);
-    addPrefill(url, googleFormEntries.name, prefill.name);
-    addPrefill(url, googleFormEntries.email, prefill.email);
-    return url.toString();
-  } catch {
-    return normalized;
-  }
-}
-
-function addPrefill(url: URL, entryId: string, value: string | null | undefined) {
-  const trimmed = value?.trim();
-  if (trimmed) {
-    url.searchParams.set(entryId, trimmed);
-  }
-}
-
 function isGoogleFormUrl(url: URL) {
   return url.hostname === "docs.google.com" && url.pathname.includes("/forms/");
+}
+
+function normalizeGoogleFormActionUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (!isGoogleFormUrl(url)) {
+      return value;
+    }
+    if (url.pathname.endsWith("/viewform")) {
+      url.pathname = url.pathname.replace(/\/viewform$/, "/formResponse");
+      url.search = "";
+      return url.toString();
+    }
+    if (url.pathname.endsWith("/edit")) {
+      url.pathname = url.pathname.replace(/\/edit$/, "/formResponse");
+      url.search = "";
+      return url.toString();
+    }
+    return value;
+  } catch {
+    return value;
+  }
 }
 
 function normalizeGoogleFormUrl(value: string) {

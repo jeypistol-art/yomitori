@@ -5,12 +5,13 @@ import {
   ChevronLeft,
   ClipboardList,
   Mail,
-  MessageCircle,
   ShieldCheck,
 } from "lucide-react";
 import { getServerSession } from "next-auth";
+import EnterpriseContactFormClient from "@/components/EnterpriseContactFormClient";
 import {
-  getEnterpriseContactFormUrl,
+  enterpriseContactFormEntries,
+  getEnterpriseContactFormActionUrl,
   getEnterpriseContactMailtoHref,
 } from "@/lib/enterprise_contact";
 import { authOptions } from "@/lib/auth_options";
@@ -44,11 +45,7 @@ export default async function EnterpriseContactPage() {
   const currentOrganization = session?.user?.id
     ? await getCurrentOrganization(session.user.id)
     : null;
-  const formUrl = getEnterpriseContactFormUrl({
-    companyName: currentOrganization?.organization_name,
-    email: session?.user?.email,
-    name: session?.user?.name,
-  });
+  const formActionUrl = getEnterpriseContactFormActionUrl();
   const mailtoHref = getEnterpriseContactMailtoHref();
 
   return (
@@ -123,10 +120,10 @@ export default async function EnterpriseContactPage() {
 
             <section className="border border-[#f0d6a8] bg-[#fff8eb] p-5">
               <p className="text-sm font-bold text-[#9a5b13]">
-                フォームが表示されない場合
+                送信できない場合
               </p>
               <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-                GoogleフォームのURLが未設定、またはブラウザ側で埋め込みが制限されている可能性があります。
+                ブラウザ側の制限でフォーム送信ができない場合は、メールでも相談できます。
               </p>
               <a
                 href={mailtoHref}
@@ -140,36 +137,18 @@ export default async function EnterpriseContactPage() {
 
           <section className="min-h-[720px] border border-[#d9ded3] bg-white">
             <div className="border-b border-[#e5e9df] px-5 py-4">
-              <p className="text-sm font-bold text-[#2f5d50]">Contact Form</p>
+              <p className="text-sm font-bold text-[#2f5d50]">Consultation Form</p>
               <h2 className="mt-1 text-xl font-bold">Enterprise導入相談フォーム</h2>
             </div>
-            {formUrl ? (
-              <iframe
-                src={formUrl}
-                title="YOMITORI DocuTask Enterprise導入相談フォーム"
-                className="h-[760px] w-full border-0"
-              />
-            ) : (
-              <div className="flex min-h-[640px] flex-col items-center justify-center px-6 py-12 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#fff8eb] text-[#9a5b13]">
-                  <MessageCircle className="h-7 w-7" />
-                </div>
-                <h3 className="mt-4 text-xl font-bold">GoogleフォームURLを設定してください</h3>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-[#4b5563]">
-                  Cloudflareの環境変数にGoogleフォームの公開URLを設定すると、このページにフォームが表示されます。
-                </p>
-                <div className="mt-5 max-w-xl border border-[#e1e6dc] bg-[#fbfcf8] px-4 py-3 text-left font-mono text-xs leading-6 text-[#4b5563]">
-                  ENTERPRISE_CONTACT_FORM_URL=https://docs.google.com/forms/...
-                </div>
-                <a
-                  href={mailtoHref}
-                  className="mt-6 inline-flex h-10 items-center gap-2 rounded-md bg-[#9a5b13] px-4 text-sm font-bold text-white"
-                >
-                  <Mail className="h-4 w-4" />
-                  メールで相談する
-                </a>
-              </div>
-            )}
+            <EnterpriseContactFormClient
+              actionUrl={formActionUrl}
+              entries={enterpriseContactFormEntries}
+              initialValues={{
+                companyName: currentOrganization?.organization_name ?? "",
+                email: session?.user?.email ?? "",
+                name: session?.user?.name ?? "",
+              }}
+            />
           </section>
         </div>
       </div>
