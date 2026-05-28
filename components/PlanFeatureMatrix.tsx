@@ -12,7 +12,7 @@ import {
   type FeatureKey,
 } from "@/lib/feature_gates";
 import { PLAN_CATALOG } from "@/lib/usage_catalog";
-import { getEnterpriseContactHref } from "@/lib/enterprise_contact";
+import { getEnterpriseContactPageHref } from "@/lib/enterprise_contact";
 
 const themeLabels = {
   personal: "個人の効率化",
@@ -117,7 +117,7 @@ export default function PlanFeatureMatrix({
   currentPlanCode: string;
 }) {
   const currentAvailability = getFeatureAvailability(currentPlanCode);
-  const enterpriseContactHref = getEnterpriseContactHref();
+  const enterpriseContactHref = getEnterpriseContactPageHref();
 
   return (
     <section className="border border-[#d9ded3] bg-white">
@@ -144,7 +144,6 @@ export default function PlanFeatureMatrix({
           const isReadyLink = isPlanAvailable && isReady;
           const isClickable = isReadyLink || isConsultation;
           const href = isConsultation ? enterpriseContactHref : destination.href;
-          const opensNewTab = href.startsWith("http");
           const cardClassName = isReadyLink
             ? "block border border-[#cde5d5] bg-[#f1faf4] p-4 transition hover:border-[#2f5d50] hover:bg-[#e7f5ec] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f5d50]"
             : isConsultation
@@ -216,15 +215,9 @@ export default function PlanFeatureMatrix({
               {content}
             </Link>
           ) : isConsultation ? (
-            <a
-              key={feature.key}
-              href={href}
-              className={cardClassName}
-              rel={opensNewTab ? "noreferrer" : undefined}
-              target={opensNewTab ? "_blank" : undefined}
-            >
+            <Link key={feature.key} href={href} className={cardClassName}>
               {content}
-            </a>
+            </Link>
           ) : (
             <div
               key={feature.key}

@@ -14,7 +14,7 @@ import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
-import { getEnterpriseContactHref } from "@/lib/enterprise_contact";
+import { getEnterpriseContactPageHref } from "@/lib/enterprise_contact";
 import { EXTRA_PACK_CATALOG, PLAN_CATALOG } from "@/lib/usage_catalog";
 
 export const metadata: Metadata = {
@@ -47,8 +47,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
     resolvedSearchParams.plan_change === "return" ||
     resolvedSearchParams.plan_change === "synced" ||
     resolvedSearchParams.billing_portal === "return";
-  const enterpriseContactHref = getEnterpriseContactHref();
-  const opensNewTab = enterpriseContactHref.startsWith("http");
+  const enterpriseContactHref = getEnterpriseContactPageHref();
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -181,15 +180,13 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
                   </p>
                 </div>
               </div>
-              <a
+              <Link
                 href={enterpriseContactHref}
-                rel={opensNewTab ? "noreferrer" : undefined}
-                target={opensNewTab ? "_blank" : undefined}
                 className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#9a5b13] px-3 text-sm font-bold text-white hover:bg-[#7c460d]"
               >
                 導入相談を送る
                 <MessageCircle className="h-4 w-4" />
-              </a>
+              </Link>
             </section>
 
             <section className="border border-[#d9ded3] bg-white">

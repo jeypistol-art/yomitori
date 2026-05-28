@@ -1,4 +1,5 @@
 const defaultContactEmail = "info@morimori-labo.monster";
+const enterpriseContactPageHref = "/enterprise/contact";
 
 function extractEmail(value: string | undefined) {
   if (!value) {
@@ -12,14 +13,23 @@ function extractEmail(value: string | undefined) {
   return plain?.[0] ?? null;
 }
 
-export function getEnterpriseContactHref() {
+export function getEnterpriseContactPageHref() {
+  return enterpriseContactPageHref;
+}
+
+export function getEnterpriseContactFormUrl() {
   const explicitUrl =
+    process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_FORM_URL?.trim() ||
+    process.env.ENTERPRISE_CONTACT_FORM_URL?.trim() ||
     process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_URL?.trim() ||
     process.env.ENTERPRISE_CONTACT_URL?.trim();
   if (explicitUrl) {
-    return explicitUrl;
+    return normalizeGoogleFormUrl(explicitUrl);
   }
+  return null;
+}
 
+export function getEnterpriseContactMailtoHref() {
   const contactEmail =
     process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL?.trim() ||
     extractEmail(process.env.EMAIL_FROM) ||
@@ -37,4 +47,31 @@ export function getEnterpriseContactHref() {
   );
 
   return `mailto:${contactEmail}?subject=${subject}&body=${body}`;
+}
+
+function normalizeGoogleFormUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (
+      url.hostname === "docs.google.com" &&
+      url.pathname.includes("/forms/") &&
+      url.pathname.endsWith("/viewform")
+    ) {
+      url.searchParams.set("embedded", "true");
+      return url.toString();
+    }
+    if (
+      url.hostname === "docs.google.com" &&
+      url.pathname.includes("/forms/") &&
+      url.pathname.endsWith("/edit")
+    ) {
+      url.pathname = url.pathname.replace(/\/edit$/, "/viewform");
+      url.search = "";
+      url.searchParams.set("embedded", "true");
+      return url.toString();
+    }
+    return value;
+  } catch {
+    return value;
+  }
 }
