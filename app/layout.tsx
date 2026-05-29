@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/favicon.ico", type: "image/svg+xml" }],
     shortcut: [{ url: "/favicon.ico", type: "image/svg+xml" }],
-    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/manifest.webmanifest",
   openGraph: {
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: [
       {
-        url: "/opengraph-image",
+        url: "/images/ogp-yomitori-docutask.png",
         width: 1200,
         height: 630,
         alt: `${siteTitle} - 書類を、要約・タスク・リマインド・証跡へ。`,
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${siteTitle} | 書類を、要約・タスク・リマインド・証跡へ。`,
     description: siteDescription,
-    images: ["/twitter-image"],
+    images: ["/images/ogp-yomitori-docutask.png"],
   },
   robots: {
     index: true,
