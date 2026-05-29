@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
+import HeaderAccountActions from "@/components/HeaderAccountActions";
 import UnprocessedQueueClient from "@/components/UnprocessedQueueClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
@@ -43,12 +44,10 @@ export default async function UnprocessedPage() {
             <p className="text-xs font-semibold text-[#2f5d50]">Work Queue</p>
             <h1 className="mt-1 text-3xl font-bold">未処理一覧</h1>
           </div>
-          <div className="border border-[#d9ded3] bg-white px-4 py-3 text-right">
-            <p className="text-sm font-bold">{currentOrganization.organization_name}</p>
-            <p className="mt-1 text-xs font-semibold text-[#5f6b5f]">
-              {currentOrganization.role}
-            </p>
-          </div>
+          <HeaderAccountActions
+            organizationName={currentOrganization.organization_name}
+            role={currentOrganization.role}
+          />
         </header>
 
         <div className="space-y-5">

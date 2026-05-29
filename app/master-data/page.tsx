@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
+import HeaderAccountActions from "@/components/HeaderAccountActions";
 import MasterDataClient from "@/components/MasterDataClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
@@ -45,12 +46,10 @@ export default async function MasterDataPage() {
             </p>
             <h1 className="mt-1 text-3xl font-bold">台帳設定</h1>
           </div>
-          <div className="border border-[#d9ded3] bg-white px-4 py-3 text-right">
-            <p className="text-sm font-bold">{currentOrganization.organization_name}</p>
-            <p className="mt-1 text-xs font-semibold uppercase text-[#5f6b5f]">
-              {currentOrganization.role}
-            </p>
-          </div>
+          <HeaderAccountActions
+            organizationName={currentOrganization.organization_name}
+            role={currentOrganization.role}
+          />
         </header>
 
         <div className="space-y-5">

@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import TeamMembersClient from "@/components/TeamMembersClient";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
+import HeaderAccountActions from "@/components/HeaderAccountActions";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
 import { canUseFeature } from "@/lib/feature_gates";
@@ -49,12 +50,10 @@ export default async function TeamPage() {
             </p>
             <h1 className="mt-1 text-3xl font-bold">担当者設定</h1>
           </div>
-          <div className="border border-[#d9ded3] bg-white px-4 py-3 text-right">
-            <p className="text-sm font-bold">{currentOrganization.organization_name}</p>
-            <p className="mt-1 text-xs font-semibold uppercase text-[#5f6b5f]">
-              {currentOrganization.role}
-            </p>
-          </div>
+          <HeaderAccountActions
+            organizationName={currentOrganization.organization_name}
+            role={currentOrganization.role}
+          />
         </header>
 
         <div className="space-y-5">

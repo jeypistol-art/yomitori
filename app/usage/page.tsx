@@ -9,6 +9,7 @@ import BillingProfileClient from "@/components/BillingProfileClient";
 import BillingStatusClient from "@/components/BillingStatusClient";
 import BillingWebhookEventsClient from "@/components/BillingWebhookEventsClient";
 import ExtraPackHistoryClient from "@/components/ExtraPackHistoryClient";
+import HeaderAccountActions from "@/components/HeaderAccountActions";
 import UsageEventLedgerClient from "@/components/UsageEventLedgerClient";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import PlanFeatureMatrix from "@/components/PlanFeatureMatrix";
@@ -67,12 +68,10 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
             </p>
             <h1 className="mt-1 text-3xl font-bold">利用状況・プラン</h1>
           </div>
-          <div className="border border-[#d9ded3] bg-white px-4 py-3 text-right">
-            <p className="text-sm font-bold">{currentOrganization.organization_name}</p>
-            <p className="mt-1 text-xs font-semibold text-[#5f6b5f]">
-              {currentOrganization.role}
-            </p>
-          </div>
+          <HeaderAccountActions
+            organizationName={currentOrganization.organization_name}
+            role={currentOrganization.role}
+          />
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

@@ -13,6 +13,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth_options";
 import DashboardFocusClient from "@/components/DashboardFocusClient";
+import LogoutButton from "@/components/LogoutButton";
 import PlanUpgradePanel from "@/components/PlanUpgradePanel";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import { getCurrentOrganization } from "@/lib/current_organization";
@@ -94,6 +95,7 @@ export default async function DashboardPage() {
               <FilePlus className="h-4 w-4" />
               書類を登録
             </Link>
+            <LogoutButton />
           </div>
         </header>
 
