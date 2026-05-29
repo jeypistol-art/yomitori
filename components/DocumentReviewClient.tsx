@@ -73,6 +73,25 @@ type ReviewPayload = {
 
 type DocumentDiffStatus = "added" | "removed" | "changed" | "unchanged";
 
+type DocumentDiffMatch = {
+  reason: string;
+  asset_overlap_count: number;
+  same_counterparty: boolean;
+  same_type: boolean;
+  manual: boolean;
+};
+
+type DocumentDiffCandidate = {
+  id: string;
+  title: string;
+  document_type: string;
+  status: string;
+  created_at: string;
+  approved_at: string | null;
+  counterparty_name: string | null;
+  match: DocumentDiffMatch;
+};
+
 type DocumentDiffPayload = {
   previous_document: {
     id: string;
@@ -84,12 +103,8 @@ type DocumentDiffPayload = {
     counterparty_name: string | null;
     assets: Array<{ id: string; name: string; asset_type: string }>;
   } | null;
-  match: {
-    reason: string;
-    asset_overlap_count: number;
-    same_counterparty: boolean;
-    same_type: boolean;
-  } | null;
+  candidates: DocumentDiffCandidate[];
+  match: DocumentDiffMatch | null;
   scalar_changes: Array<{
     key: string;
     label: string;
@@ -350,11 +365,15 @@ function DocumentDiffPanel({
   diff,
   error,
   isLoading,
+  onSelectCompareDocumentId,
+  selectedCompareDocumentId,
 }: {
   canUseDocumentDiff: boolean;
   diff: DocumentDiffPayload | null;
   error: string;
   isLoading: boolean;
+  onSelectCompareDocumentId: (documentId: string) => void;
+  selectedCompareDocumentId: string;
 }) {
   if (!canUseDocumentDiff) {
     return (
@@ -399,6 +418,26 @@ function DocumentDiffPanel({
     );
   }
 
+  const candidates = diff?.candidates ?? [];
+  const candidateSelector = candidates.length > 0 ? (
+    <label className="mt-4 block">
+      <span className="text-xs font-bold text-[#4b5563]">比較対象を選択</span>
+      <select
+        value={selectedCompareDocumentId}
+        onChange={(event) => onSelectCompareDocumentId(event.target.value)}
+        className="mt-1 h-10 w-full border border-[#d9ded3] bg-white px-3 text-sm outline-none focus:border-[#2f5d50]"
+      >
+        <option value="">自動選択</option>
+        {candidates.map((candidate) => (
+          <option key={candidate.id} value={candidate.id}>
+            {formatDateTime(candidate.created_at)} / {candidate.title} /{" "}
+            {candidate.match.reason}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
+
   if (!diff?.previous_document) {
     return (
       <div className="border border-[#d9ded3] bg-white p-4">
@@ -407,10 +446,13 @@ function DocumentDiffPanel({
           <div>
             <h3 className="text-base font-bold">過去書類との差分</h3>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-              比較できる過去書類はまだありません。同じ管理対象、取引先、書類種別の過去書類が登録されると、ここに差分が表示されます。
+              {candidates.length > 0
+                ? "自動で一致する過去書類は見つかりませんでした。必要に応じて比較対象を手動で選択できます。"
+                : "比較できる過去書類はまだありません。同じ管理対象、取引先、書類種別の過去書類が登録されると、ここに差分が表示されます。"}
             </p>
           </div>
         </div>
+        {candidateSelector}
       </div>
     );
   }
@@ -457,6 +499,8 @@ function DocumentDiffPanel({
           </div>
         </div>
       </div>
+
+      {candidateSelector}
 
       {!hasChanges ? (
         <p className="mt-4 border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-3 text-sm leading-6 text-[#4b5563]">
@@ -557,10 +601,46 @@ export default function DocumentReviewClient({
   const [isDiffLoading, setIsDiffLoading] = useState(false);
   const [documentDiff, setDocumentDiff] = useState<DocumentDiffPayload | null>(null);
   const [diffError, setDiffError] = useState("");
+  const [selectedCompareDocumentId, setSelectedCompareDocumentId] = useState("");
   const [createdTasks, setCreatedTasks] = useState<Array<{ id: string; title: string }>>([]);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const loadDocumentDiff = useCallback(
+    async (compareDocumentId = "") => {
+      if (!canUseDocumentDiff) {
+        setDocumentDiff(null);
+        setDiffError("");
+        return;
+      }
+
+      setIsDiffLoading(true);
+      setDiffError("");
+      try {
+        const params = new URLSearchParams();
+        if (compareDocumentId) {
+          params.set("compare_document_id", compareDocumentId);
+        }
+        const diffResult = await fetchJson<ApiItem<DocumentDiffPayload>>(
+          `/api/documents/${documentId}/diff${
+            params.toString() ? `?${params.toString()}` : ""
+          }`
+        );
+        setDocumentDiff(diffResult.data);
+      } catch (diffLoadError) {
+        setDocumentDiff(null);
+        setDiffError(
+          diffLoadError instanceof Error
+            ? diffLoadError.message
+            : "差分の読み込みに失敗しました"
+        );
+      } finally {
+        setIsDiffLoading(false);
+      }
+    },
+    [canUseDocumentDiff, documentId]
+  );
 
   const loadReview = useCallback(async () => {
     setIsLoading(true);
@@ -576,22 +656,8 @@ export default function DocumentReviewClient({
       setSelectedFileId(result.data.files[0]?.id ?? null);
 
       if (canUseDocumentDiff) {
-        setIsDiffLoading(true);
-        try {
-          const diffResult = await fetchJson<ApiItem<DocumentDiffPayload>>(
-            `/api/documents/${documentId}/diff`
-          );
-          setDocumentDiff(diffResult.data);
-        } catch (diffLoadError) {
-          setDocumentDiff(null);
-          setDiffError(
-            diffLoadError instanceof Error
-              ? diffLoadError.message
-              : "差分の読み込みに失敗しました"
-          );
-        } finally {
-          setIsDiffLoading(false);
-        }
+        setSelectedCompareDocumentId("");
+        await loadDocumentDiff();
       } else {
         setDocumentDiff(null);
       }
@@ -600,11 +666,19 @@ export default function DocumentReviewClient({
     } finally {
       setIsLoading(false);
     }
-  }, [canUseDocumentDiff, documentId]);
+  }, [canUseDocumentDiff, documentId, loadDocumentDiff]);
 
   useEffect(() => {
     void loadReview();
   }, [loadReview]);
+
+  const handleSelectCompareDocumentId = useCallback(
+    (compareDocumentId: string) => {
+      setSelectedCompareDocumentId(compareDocumentId);
+      void loadDocumentDiff(compareDocumentId);
+    },
+    [loadDocumentDiff]
+  );
 
   const selectedFile = useMemo(
     () => payload?.files.find((file) => file.id === selectedFileId) ?? payload?.files[0],
@@ -1023,6 +1097,8 @@ export default function DocumentReviewClient({
             diff={documentDiff}
             error={diffError}
             isLoading={isDiffLoading}
+            onSelectCompareDocumentId={handleSelectCompareDocumentId}
+            selectedCompareDocumentId={selectedCompareDocumentId}
           />
 
           <div className="border border-[#d9ded3] bg-white p-4">

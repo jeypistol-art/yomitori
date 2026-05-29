@@ -78,6 +78,27 @@ export type DocumentListDiff = {
   current_count: number;
 };
 
+export type DocumentDiffMatch = {
+  reason: string;
+  asset_overlap_count: number;
+  same_counterparty: boolean;
+  same_type: boolean;
+  manual: boolean;
+};
+
+export type DocumentDiffCandidate = Pick<
+  Snapshot,
+  | "id"
+  | "title"
+  | "document_type"
+  | "status"
+  | "created_at"
+  | "approved_at"
+  | "counterparty_name"
+> & {
+  match: DocumentDiffMatch;
+};
+
 export type DocumentDiffResult = {
   current_document: Pick<
     Snapshot,
@@ -101,12 +122,8 @@ export type DocumentDiffResult = {
     | "counterparty_name"
     | "assets"
   > | null;
-  match: {
-    reason: string;
-    asset_overlap_count: number;
-    same_counterparty: boolean;
-    same_type: boolean;
-  } | null;
+  candidates: DocumentDiffCandidate[];
+  match: DocumentDiffMatch | null;
   scalar_changes: DocumentScalarDiff[];
   list_changes: DocumentListDiff[];
   summary: {
@@ -409,7 +426,7 @@ async function getReviewDraft(organizationId: string, documentId: string) {
   return result.rows[0] ?? null;
 }
 
-async function findPreviousDocument(args: {
+async function findPreviousDocuments(args: {
   organizationId: string;
   currentDocument: DiffDocumentRow;
   currentAssetIds: string[];
@@ -457,30 +474,13 @@ async function findPreviousDocument(args: {
        AND d.deleted_at IS NULL
        AND d.status <> 'failed'
        AND d.created_at < $6::timestamptz
-       AND (
-         EXISTS (
-           SELECT 1
-           FROM document_assets da
-           WHERE da.organization_id = d.organization_id
-             AND da.document_id = d.id
-             AND da.managed_asset_id = ANY($3::uuid[])
-         )
-         OR (
-           $4::uuid IS NOT NULL
-           AND d.counterparty_id = $4::uuid
-         )
-         OR (
-           $5::text <> 'unknown'
-           AND d.document_type::text = $5::text
-         )
-       )
      ORDER BY
        asset_overlap_count DESC,
        same_counterparty DESC,
        same_type DESC,
        d.approved_at DESC NULLS LAST,
        d.created_at DESC
-     LIMIT 1`,
+     LIMIT 20`,
     [
       args.organizationId,
       args.currentDocument.id,
@@ -491,7 +491,7 @@ async function findPreviousDocument(args: {
     ]
   );
 
-  return result.rows[0] ?? null;
+  return result.rows;
 }
 
 function publicSnapshot(snapshot: Snapshot) {
@@ -521,9 +521,54 @@ function matchReason(candidate: CandidateRow) {
   return reasons.join(" / ") || "作成日時が近い過去書類";
 }
 
+function isMatchedCandidate(candidate: CandidateRow) {
+  return (
+    candidate.asset_overlap_count > 0 ||
+    candidate.same_counterparty ||
+    candidate.same_type
+  );
+}
+
+function matchFromCandidate(
+  candidate: CandidateRow,
+  manual = false
+): DocumentDiffMatch {
+  return {
+    reason: manual ? `手動選択 / ${matchReason(candidate)}` : matchReason(candidate),
+    asset_overlap_count: candidate.asset_overlap_count,
+    same_counterparty: candidate.same_counterparty,
+    same_type: candidate.same_type,
+    manual,
+  };
+}
+
+function manualMatch(): DocumentDiffMatch {
+  return {
+    reason: "手動選択",
+    asset_overlap_count: 0,
+    same_counterparty: false,
+    same_type: false,
+    manual: true,
+  };
+}
+
+function publicCandidate(candidate: CandidateRow): DocumentDiffCandidate {
+  return {
+    id: candidate.id,
+    title: candidate.suggested_title || candidate.title,
+    document_type: candidate.document_type,
+    status: candidate.status,
+    created_at: candidate.created_at,
+    approved_at: candidate.approved_at,
+    counterparty_name: candidate.counterparty_name,
+    match: matchFromCandidate(candidate),
+  };
+}
+
 export async function buildDocumentDiff(args: {
   organizationId: string;
   documentId: string;
+  compareDocumentId?: string | null;
 }): Promise<DocumentDiffResult> {
   const currentDocument = await getDocumentRow(args.organizationId, args.documentId);
   if (!currentDocument) {
@@ -542,16 +587,49 @@ export async function buildDocumentDiff(args: {
     draft: currentDraft,
   });
 
-  const previousDocument = await findPreviousDocument({
+  const candidateRows = await findPreviousDocuments({
     organizationId: args.organizationId,
     currentDocument,
     currentAssetIds: currentAssets.map((asset) => asset.id),
   });
+  const candidates = candidateRows.map(publicCandidate);
+  const selectedCandidate = args.compareDocumentId
+    ? candidateRows.find((candidate) => candidate.id === args.compareDocumentId)
+    : null;
+  const selectedManualDocument =
+    args.compareDocumentId && !selectedCandidate
+      ? await getDocumentRow(args.organizationId, args.compareDocumentId)
+      : null;
+  const autoCandidate = candidateRows.find(isMatchedCandidate) ?? null;
+  const hasManualSelection = Boolean(args.compareDocumentId);
+  const previousDocument = hasManualSelection
+    ? selectedCandidate ?? selectedManualDocument ?? null
+    : autoCandidate;
+  const match = selectedCandidate
+    ? matchFromCandidate(selectedCandidate, Boolean(args.compareDocumentId))
+    : selectedManualDocument
+      ? manualMatch()
+      : autoCandidate
+        ? matchFromCandidate(autoCandidate)
+        : null;
+
+  if (args.compareDocumentId) {
+    if (args.compareDocumentId === currentDocument.id) {
+      throw new Error("cannot compare same document");
+    }
+    if (!previousDocument || previousDocument.status === "failed") {
+      throw new Error("compare document not found");
+    }
+    if (new Date(previousDocument.created_at) >= new Date(currentDocument.created_at)) {
+      throw new Error("compare document must be older");
+    }
+  }
 
   if (!previousDocument) {
     return {
       current_document: publicSnapshot(currentSnapshot),
       previous_document: null,
+      candidates,
       match: null,
       scalar_changes: [],
       list_changes: [],
@@ -611,12 +689,8 @@ export async function buildDocumentDiff(args: {
   return {
     current_document: publicSnapshot(currentSnapshot),
     previous_document: publicSnapshot(previousSnapshot),
-    match: {
-      reason: matchReason(previousDocument),
-      asset_overlap_count: previousDocument.asset_overlap_count,
-      same_counterparty: previousDocument.same_counterparty,
-      same_type: previousDocument.same_type,
-    },
+    candidates,
+    match,
     scalar_changes: scalarChanges,
     list_changes: listChanges,
     summary: summarizeDiffs(scalarChanges, listChanges),

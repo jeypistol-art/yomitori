@@ -115,7 +115,7 @@ export const FEATURE_GATES: FeatureGate[] = [
   {
     key: "priority_processing",
     label: "優先処理",
-    description: "重要書類を優先して処理する運用に対応します。",
+    description: "期限切れ、期限接近、注意点ありの書類とタスクを優先表示します。",
     minimumPlan: "pro",
     valueTheme: "trust",
   },

@@ -24,6 +24,9 @@ type PendingDocument = {
   status: string;
   file_count: number;
   duplicate_count: number;
+  priority_rank: number;
+  priority_label: string;
+  priority_reason: string;
   created_at: string;
   updated_at: string;
 };
@@ -60,6 +63,9 @@ type QueuePayload = {
     documents: PendingDocument[];
     tasks: PendingTask[];
     stats: QueueStats;
+    features: {
+      priority_processing: boolean;
+    };
   };
 };
 
@@ -82,6 +88,12 @@ const priorityLabels: Record<string, string> = {
   normal: "通常",
   high: "高",
   urgent: "至急",
+};
+
+const documentPriorityClassNames: Record<string, string> = {
+  至急: "bg-[#fff1f0] text-[#9f352c]",
+  高: "bg-[#fff8eb] text-[#9a5b13]",
+  通常: "bg-[#edf2e8] text-[#2f5d50]",
 };
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -126,6 +138,9 @@ export default function UnprocessedQueueClient() {
     overdue_tasks: 0,
     unassigned_tasks: 0,
   });
+  const [features, setFeatures] = useState({
+    priority_processing: false,
+  });
   const [view, setView] = useState<"all" | "documents" | "tasks">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -140,6 +155,7 @@ export default function UnprocessedQueueClient() {
       setDocuments(payload.data.documents);
       setTasks(payload.data.tasks);
       setStats(payload.data.stats);
+      setFeatures(payload.data.features);
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
@@ -291,6 +307,18 @@ export default function UnprocessedQueueClient() {
             {error}
           </p>
         ) : null}
+        {features.priority_processing ? (
+          <p className="mt-3 border border-[#cde5d5] bg-[#f1faf4] px-4 py-3 text-sm font-semibold text-[#24613f]">
+            優先処理が有効です。期限切れ、期限接近、対応タスクあり、注意点ありの順に重要度を付けて表示しています。
+          </p>
+        ) : (
+          <p className="mt-3 border border-[#e1e6dc] bg-[#fbfcf8] px-4 py-3 text-sm leading-6 text-[#5f6b5f]">
+            優先処理はProプラン以上で利用できます。期限や注意点をもとに、重要な書類から並べ替えます。
+            <Link href="/usage" className="ml-2 font-bold text-[#2f5d50]">
+              プランを見る
+            </Link>
+          </p>
+        )}
       </section>
 
       {isLoading ? (
@@ -324,6 +352,16 @@ export default function UnprocessedQueueClient() {
                         <span className="rounded bg-[#f3f4f6] px-2 py-1 text-xs font-bold text-[#4b5563]">
                           {document.document_type}
                         </span>
+                        {features.priority_processing ? (
+                          <span
+                            className={`rounded px-2 py-1 text-xs font-bold ${
+                              documentPriorityClassNames[document.priority_label] ??
+                              "bg-[#edf2e8] text-[#2f5d50]"
+                            }`}
+                          >
+                            優先 {document.priority_label}
+                          </span>
+                        ) : null}
                         <span className="text-xs font-semibold text-[#6b7280]">
                           {document.file_count > 0 ? `${document.file_count}ファイル` : "本文"}
                         </span>
@@ -345,6 +383,11 @@ export default function UnprocessedQueueClient() {
                       {document.due_date ? (
                         <p className={`mt-2 text-sm font-bold ${getDueTone(document.due_date)}`}>
                           期限 {document.due_date}
+                        </p>
+                      ) : null}
+                      {features.priority_processing ? (
+                        <p className="mt-2 text-xs font-semibold text-[#6b7280]">
+                          優先理由: {document.priority_reason}
                         </p>
                       ) : null}
                       <div className="mt-4 flex flex-wrap justify-end gap-2">

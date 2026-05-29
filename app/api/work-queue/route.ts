@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiContext } from "@/lib/api_context";
 import { jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
-import { requireFeatureAccess } from "@/lib/feature_gates";
+import { canUseFeature, requireFeatureAccess } from "@/lib/feature_gates";
 
 type PendingDocumentRow = {
   id: string;
@@ -15,6 +15,9 @@ type PendingDocumentRow = {
   status: string;
   file_count: number;
   duplicate_count: number;
+  priority_rank: number;
+  priority_label: string;
+  priority_reason: string;
   created_at: string;
   updated_at: string;
 };
@@ -50,6 +53,10 @@ export async function GET() {
   try {
     const { currentOrganization } = await requireApiContext();
     requireFeatureAccess(currentOrganization.plan_code, "monthly_work_queue");
+    const canUsePriorityProcessing = canUseFeature(
+      currentOrganization.plan_code,
+      "priority_processing"
+    );
     const organizationId = currentOrganization.organization_id;
 
     const [documents, tasks, stats] = await Promise.all([
@@ -64,6 +71,34 @@ export async function GET() {
            d.source_type::text AS source_type,
            d.status::text AS status,
            count(DISTINCT df.id)::int AS file_count,
+           CASE
+             WHEN d.status = 'failed' THEN 100
+             WHEN d.due_date IS NOT NULL AND d.due_date < CURRENT_DATE THEN 95
+             WHEN d.status = 'action_required' THEN 85
+             WHEN d.due_date IS NOT NULL AND d.due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 80
+             WHEN jsonb_array_length(d.risks) > 0 THEN 70
+             WHEN d.status = 'needs_review' THEN 60
+             WHEN d.status = 'uploaded' THEN 50
+             ELSE 40
+           END AS priority_rank,
+           CASE
+             WHEN d.status = 'failed' THEN '至急'
+             WHEN d.due_date IS NOT NULL AND d.due_date < CURRENT_DATE THEN '至急'
+             WHEN d.status = 'action_required' THEN '高'
+             WHEN d.due_date IS NOT NULL AND d.due_date <= CURRENT_DATE + INTERVAL '7 days' THEN '高'
+             WHEN jsonb_array_length(d.risks) > 0 THEN '高'
+             ELSE '通常'
+           END AS priority_label,
+           CASE
+             WHEN d.status = 'failed' THEN 'AI抽出に失敗しています'
+             WHEN d.due_date IS NOT NULL AND d.due_date < CURRENT_DATE THEN '期限を過ぎています'
+             WHEN d.status = 'action_required' THEN '対応タスク候補があります'
+             WHEN d.due_date IS NOT NULL AND d.due_date <= CURRENT_DATE + INTERVAL '7 days' THEN '期限が7日以内です'
+             WHEN jsonb_array_length(d.risks) > 0 THEN '注意点があります'
+             WHEN d.status = 'needs_review' THEN '承認確認が必要です'
+             WHEN d.status = 'uploaded' THEN 'AI抽出待ちです'
+             ELSE '未処理です'
+           END AS priority_reason,
            (
              SELECT count(DISTINCT d2.id)::int
              FROM documents d2
@@ -107,17 +142,31 @@ export async function GET() {
            AND d.status IN ('uploaded', 'processing', 'needs_review', 'action_required', 'failed')
          GROUP BY d.id
          ORDER BY
-           CASE d.status
+           CASE WHEN $2::boolean THEN
+             CASE
+               WHEN d.status = 'failed' THEN 100
+               WHEN d.due_date IS NOT NULL AND d.due_date < CURRENT_DATE THEN 95
+               WHEN d.status = 'action_required' THEN 85
+               WHEN d.due_date IS NOT NULL AND d.due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 80
+               WHEN jsonb_array_length(d.risks) > 0 THEN 70
+               WHEN d.status = 'needs_review' THEN 60
+               WHEN d.status = 'uploaded' THEN 50
+               ELSE 40
+             END
+           END DESC NULLS LAST,
+           CASE WHEN NOT $2::boolean THEN
+             CASE d.status
              WHEN 'failed' THEN 0
              WHEN 'action_required' THEN 1
              WHEN 'needs_review' THEN 2
              WHEN 'uploaded' THEN 3
              ELSE 4
+             END
            END,
            d.due_date ASC NULLS LAST,
            d.created_at DESC
          LIMIT 100`,
-        [organizationId]
+        [organizationId, canUsePriorityProcessing]
       ),
       query<PendingTaskRow>(
         `SELECT
@@ -162,16 +211,26 @@ export async function GET() {
              WHEN t.due_date < CURRENT_DATE THEN 0
              ELSE 1
            END,
+           CASE WHEN $2::boolean THEN
+             CASE t.priority
+               WHEN 'urgent' THEN 0
+               WHEN 'high' THEN 1
+               WHEN 'normal' THEN 2
+               ELSE 3
+             END
+           END ASC NULLS LAST,
            t.due_date ASC NULLS LAST,
-           CASE t.priority
-             WHEN 'urgent' THEN 1
-             WHEN 'high' THEN 2
-             WHEN 'normal' THEN 3
-             ELSE 4
+           CASE WHEN NOT $2::boolean THEN
+             CASE t.priority
+               WHEN 'urgent' THEN 1
+               WHEN 'high' THEN 2
+               WHEN 'normal' THEN 3
+               ELSE 4
+             END
            END,
            t.created_at DESC
          LIMIT 100`,
-        [organizationId]
+        [organizationId, canUsePriorityProcessing]
       ),
       query<QueueStatsRow>(
         `SELECT
@@ -229,6 +288,9 @@ export async function GET() {
         documents: documents.rows,
         tasks: tasks.rows,
         stats: stats.rows[0],
+        features: {
+          priority_processing: canUsePriorityProcessing,
+        },
       },
     });
   } catch (error) {

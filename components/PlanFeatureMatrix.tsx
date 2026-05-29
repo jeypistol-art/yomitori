@@ -38,14 +38,6 @@ const plannedFeatureRoadmap: PlannedFeatureRoadmapItem[] = [
       "複数拠点を持つ管理会社でも、担当範囲ごとの確認と引き継ぎがしやすくなります。",
   },
   {
-    featureKey: "priority_processing",
-    phase: "検証予定",
-    focus:
-      "至急、期限接近、高リスクの書類を未処理一覧や承認画面で上位表示します。",
-    outcome:
-      "処理順に迷う時間を減らし、重要書類から片付ける運用を作れます。",
-  },
-  {
     featureKey: "api_webhooks",
     phase: "個別要件確認",
     focus:
@@ -115,8 +107,8 @@ const featureDestinations: Record<
   },
   priority_processing: {
     href: "/unprocessed",
-    actionLabel: "下のロードマップで確認",
-    status: "planned",
+    actionLabel: "未処理一覧へ",
+    status: "ready",
   },
   document_templates: {
     href: "/setup",
