@@ -2,6 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Loader2, Send } from "lucide-react";
+import {
+  enterpriseConsultationTopicOptions,
+  enterpriseDesiredTimingOptions,
+  enterpriseIndustryOptions,
+  enterpriseManagementScaleOptions,
+  enterpriseMonthlyDocumentOptions,
+  enterprisePreferredContactOptions,
+} from "@/lib/enterprise_contact_options";
 
 type EnterpriseContactFormClientProps = {
   initialValues: {
@@ -10,51 +18,6 @@ type EnterpriseContactFormClientProps = {
     name: string;
   };
 };
-
-const industryOptions = [
-  "不動産管理",
-  "施設管理",
-  "店舗運営",
-  "士業",
-  "その他",
-];
-
-const managementScaleOptions = [
-  "1〜5拠点",
-  "6〜20拠点",
-  "21〜50拠点",
-  "51拠点以上",
-];
-
-const monthlyDocumentOptions = [
-  "〜100件",
-  "101〜300件",
-  "301〜500件",
-  "501〜1000件",
-  "1000件以上",
-];
-
-const consultationTopicOptions = [
-  "文書分類テンプレ",
-  "初期設定支援",
-  "運用ルール設計",
-  "API・Webhook連携",
-  "優先サポート",
-  "料金相談",
-];
-
-const preferredContactOptions = [
-  "メール",
-  "オンライン面談",
-  "資料が欲しい",
-];
-
-const desiredTimingOptions = [
-  "すぐ相談したい",
-  "1か月以内",
-  "3か月以内",
-  "情報収集中",
-];
 
 export default function EnterpriseContactFormClient({
   initialValues,
@@ -178,19 +141,19 @@ export default function EnterpriseContactFormClient({
           <SelectField
             label="業種"
             name="industry"
-            options={industryOptions}
+            options={enterpriseIndustryOptions}
             required
           />
           <SelectField
             label="管理対象の規模"
             name="managementScale"
-            options={managementScaleOptions}
+            options={enterpriseManagementScaleOptions}
             required
           />
           <SelectField
             label="毎月扱う書類数"
             name="monthlyDocuments"
-            options={monthlyDocumentOptions}
+            options={enterpriseMonthlyDocumentOptions}
             required
           />
         </div>
@@ -200,7 +163,7 @@ export default function EnterpriseContactFormClient({
             相談したい内容
           </legend>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {consultationTopicOptions.map((topic) => (
+            {enterpriseConsultationTopicOptions.map((topic) => (
               <label
                 key={topic}
                 className="flex cursor-pointer items-center gap-3 border border-[#d9ded3] bg-[#fbfcf8] px-3 py-3 text-sm font-semibold text-[#1f2933]"
@@ -230,12 +193,12 @@ export default function EnterpriseContactFormClient({
           <SelectField
             label="希望する連絡方法"
             name="preferredContact"
-            options={preferredContactOptions}
+            options={enterprisePreferredContactOptions}
           />
           <SelectField
             label="希望時期"
             name="desiredTiming"
-            options={desiredTimingOptions}
+            options={enterpriseDesiredTimingOptions}
           />
         </div>
 
@@ -302,7 +265,7 @@ function SelectField({
 }: {
   label: string;
   name: string;
-  options: string[];
+  options: readonly string[];
   required?: boolean;
 }) {
   return (

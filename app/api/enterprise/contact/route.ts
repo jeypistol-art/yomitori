@@ -4,49 +4,17 @@ import {
   enterpriseContactFormEntries,
   getEnterpriseContactFormActionUrl,
 } from "@/lib/enterprise_contact";
+import {
+  enterpriseConsultationTopicOptions,
+  enterpriseDesiredTimingOptions,
+  enterpriseIndustryOptions,
+  enterpriseManagementScaleOptions,
+  enterpriseMonthlyDocumentOptions,
+  enterprisePreferredContactOptions,
+  hasEnterpriseContactOption,
+} from "@/lib/enterprise_contact_options";
 
 export const dynamic = "force-dynamic";
-
-const industryOptions = [
-  "不動産管理",
-  "施設管理",
-  "店舗運営",
-  "士業",
-  "その他",
-];
-
-const managementScaleOptions = [
-  "1〜5拠点",
-  "6〜20拠点",
-  "21〜50拠点",
-  "51拠点以上",
-];
-
-const monthlyDocumentOptions = [
-  "〜100件",
-  "101〜300件",
-  "301〜500件",
-  "501〜1000件",
-  "1000件以上",
-];
-
-const consultationTopicOptions = [
-  "文書分類テンプレ",
-  "初期設定支援",
-  "運用ルール設計",
-  "API・Webhook連携",
-  "優先サポート",
-  "料金相談",
-];
-
-const preferredContactOptions = ["メール", "オンライン面談", "資料が欲しい"];
-
-const desiredTimingOptions = [
-  "すぐ相談したい",
-  "1か月以内",
-  "3か月以内",
-  "情報収集中",
-];
 
 type ContactRequest = {
   companyName?: unknown;
@@ -73,7 +41,11 @@ function requireText(value: unknown, fieldName: string) {
   return normalized;
 }
 
-function requireOption(value: unknown, options: string[], fieldName: string) {
+function requireOption(
+  value: unknown,
+  options: readonly string[],
+  fieldName: string
+) {
   const normalized = requireText(value, fieldName);
   if (!options.includes(normalized)) {
     throw new ApiError(400, `${fieldName}の値が正しくありません。`);
@@ -81,7 +53,11 @@ function requireOption(value: unknown, options: string[], fieldName: string) {
   return normalized;
 }
 
-function optionalOption(value: unknown, options: string[], fieldName: string) {
+function optionalOption(
+  value: unknown,
+  options: readonly string[],
+  fieldName: string
+) {
   const normalized = text(value);
   if (!normalized) {
     return "";
@@ -112,7 +88,12 @@ function validateTopics(value: unknown) {
   if (topics.length === 0) {
     throw new ApiError(400, "相談したい内容を1つ以上選択してください。");
   }
-  if (topics.some((topic) => !consultationTopicOptions.includes(topic))) {
+  if (
+    topics.some(
+      (topic) =>
+        !hasEnterpriseContactOption(enterpriseConsultationTopicOptions, topic)
+    )
+  ) {
     throw new ApiError(400, "相談したい内容の値が正しくありません。");
   }
   return topics;
@@ -128,27 +109,31 @@ export async function POST(request: Request) {
     const companyName = requireText(body.companyName, "会社名・屋号");
     const name = requireText(body.name, "お名前");
     const email = validateEmail(body.email);
-    const industry = requireOption(body.industry, industryOptions, "業種");
+    const industry = requireOption(
+      body.industry,
+      enterpriseIndustryOptions,
+      "業種"
+    );
     const managementScale = requireOption(
       body.managementScale,
-      managementScaleOptions,
+      enterpriseManagementScaleOptions,
       "管理対象の規模"
     );
     const monthlyDocuments = requireOption(
       body.monthlyDocuments,
-      monthlyDocumentOptions,
+      enterpriseMonthlyDocumentOptions,
       "毎月扱う書類数"
     );
     const consultationTopics = validateTopics(body.consultationTopics);
     const currentPain = text(body.currentPain).slice(0, 3000);
     const preferredContact = optionalOption(
       body.preferredContact,
-      preferredContactOptions,
+      enterprisePreferredContactOptions,
       "希望する連絡方法"
     );
     const desiredTiming = optionalOption(
       body.desiredTiming,
-      desiredTimingOptions,
+      enterpriseDesiredTimingOptions,
       "希望時期"
     );
 
