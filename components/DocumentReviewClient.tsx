@@ -6,6 +6,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileText,
+  GitCompareArrows,
+  LockKeyhole,
   Loader2,
   RefreshCw,
   Save,
@@ -69,6 +71,49 @@ type ReviewPayload = {
   members: Member[];
 };
 
+type DocumentDiffStatus = "added" | "removed" | "changed" | "unchanged";
+
+type DocumentDiffPayload = {
+  previous_document: {
+    id: string;
+    title: string;
+    document_type: string;
+    status: string;
+    created_at: string;
+    approved_at: string | null;
+    counterparty_name: string | null;
+    assets: Array<{ id: string; name: string; asset_type: string }>;
+  } | null;
+  match: {
+    reason: string;
+    asset_overlap_count: number;
+    same_counterparty: boolean;
+    same_type: boolean;
+  } | null;
+  scalar_changes: Array<{
+    key: string;
+    label: string;
+    previous: string;
+    current: string;
+    status: DocumentDiffStatus;
+  }>;
+  list_changes: Array<{
+    key: string;
+    label: string;
+    added: string[];
+    removed: string[];
+    unchanged: string[];
+    previous_count: number;
+    current_count: number;
+  }>;
+  summary: {
+    changed_count: number;
+    added_count: number;
+    removed_count: number;
+    unchanged_count: number;
+  };
+};
+
 type ApiItem<T> = {
   data: T;
 };
@@ -99,6 +144,20 @@ const assetTypeLabels: Record<string, string> = {
   tenant: "テナント",
   office: "事務所",
   other: "その他",
+};
+
+const diffStatusLabels: Record<DocumentDiffStatus, string> = {
+  added: "追加",
+  removed: "削除",
+  changed: "変更",
+  unchanged: "同じ",
+};
+
+const diffStatusClassNames: Record<DocumentDiffStatus, string> = {
+  added: "bg-[#edf7ef] text-[#24613f]",
+  removed: "bg-[#fff1f0] text-[#9f352c]",
+  changed: "bg-[#fff8eb] text-[#9a5b13]",
+  unchanged: "bg-[#f3f4f6] text-[#4b5563]",
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -140,6 +199,21 @@ function splitLines(value: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "未設定";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 10);
+  }
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function noticeText(value: unknown) {
@@ -271,14 +345,204 @@ function DraftTextArea({
   );
 }
 
+function DocumentDiffPanel({
+  canUseDocumentDiff,
+  diff,
+  error,
+  isLoading,
+}: {
+  canUseDocumentDiff: boolean;
+  diff: DocumentDiffPayload | null;
+  error: string;
+  isLoading: boolean;
+}) {
+  if (!canUseDocumentDiff) {
+    return (
+      <div className="border border-[#e1e6dc] bg-[#f4f5f1] p-4">
+        <div className="flex items-start gap-3">
+          <LockKeyhole className="mt-0.5 h-5 w-5 text-[#5f6b5f]" />
+          <div>
+            <h3 className="text-base font-bold">過去書類との差分</h3>
+            <p className="mt-2 text-sm leading-6 text-[#5f6b5f]">
+              前回書類との差分確認はProプラン以上で利用できます。
+              期限、提出物、注意点の変化を承認画面で確認できる機能です。
+            </p>
+            <Link
+              href="/usage"
+              className="mt-3 inline-flex text-sm font-bold text-[#2f5d50]"
+            >
+              プランを見る
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="border border-[#d9ded3] bg-white p-4">
+        <div className="inline-flex items-center gap-2 text-sm font-bold text-[#2f5d50]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          過去書類との差分を確認中
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border border-[#f1c9c3] bg-[#fff5f2] p-4">
+        <h3 className="text-base font-bold text-[#9a3412]">過去書類との差分</h3>
+        <p className="mt-2 text-sm leading-6 text-[#9a3412]">{error}</p>
+      </div>
+    );
+  }
+
+  if (!diff?.previous_document) {
+    return (
+      <div className="border border-[#d9ded3] bg-white p-4">
+        <div className="flex items-start gap-3">
+          <GitCompareArrows className="mt-0.5 h-5 w-5 text-[#2f5d50]" />
+          <div>
+            <h3 className="text-base font-bold">過去書類との差分</h3>
+            <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+              比較できる過去書類はまだありません。同じ管理対象、取引先、書類種別の過去書類が登録されると、ここに差分が表示されます。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const changedScalars = diff.scalar_changes.filter(
+    (item) => item.status !== "unchanged"
+  );
+  const changedLists = diff.list_changes.filter(
+    (item) => item.added.length > 0 || item.removed.length > 0
+  );
+  const hasChanges = changedScalars.length > 0 || changedLists.length > 0;
+
+  return (
+    <div className="border border-[#d9ded3] bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <GitCompareArrows className="mt-0.5 h-5 w-5 text-[#2f5d50]" />
+          <div>
+            <h3 className="text-base font-bold">過去書類との差分</h3>
+            <p className="mt-1 text-sm leading-6 text-[#4b5563]">
+              比較対象:
+              <Link
+                href={`/documents/${diff.previous_document.id}/review`}
+                className="ml-1 font-bold text-[#2f5d50]"
+              >
+                {diff.previous_document.title}
+              </Link>
+            </p>
+            <p className="text-xs font-semibold text-[#6b7280]">
+              {formatDateTime(diff.previous_document.created_at)}
+              {diff.match?.reason ? ` / ${diff.match.reason}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold">
+          <div className="bg-[#fff8eb] px-2 py-1 text-[#9a5b13]">
+            変更 {diff.summary.changed_count}
+          </div>
+          <div className="bg-[#edf7ef] px-2 py-1 text-[#24613f]">
+            追加 {diff.summary.added_count}
+          </div>
+          <div className="bg-[#fff1f0] px-2 py-1 text-[#9f352c]">
+            削除 {diff.summary.removed_count}
+          </div>
+        </div>
+      </div>
+
+      {!hasChanges ? (
+        <p className="mt-4 border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-3 text-sm leading-6 text-[#4b5563]">
+          主要項目の差分は見つかりませんでした。原本の文面や添付ファイルは必要に応じて確認してください。
+        </p>
+      ) : null}
+
+      {changedScalars.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {changedScalars.map((item) => (
+            <div key={item.key} className="border border-[#e5e9df] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold">{item.label}</p>
+                <span
+                  className={`rounded px-2 py-1 text-xs font-bold ${diffStatusClassNames[item.status]}`}
+                >
+                  {diffStatusLabels[item.status]}
+                </span>
+              </div>
+              <div className="mt-2 grid gap-2 text-sm leading-6 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-bold text-[#6b7280]">前回</p>
+                  <p className="break-words text-[#4b5563]">
+                    {item.previous || "未設定"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#6b7280]">今回</p>
+                  <p className="break-words text-[#1f2933]">
+                    {item.current || "未設定"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {changedLists.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {changedLists.map((section) => (
+            <div key={section.key} className="border border-[#e5e9df] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-bold">{section.label}</p>
+                <p className="text-xs font-semibold text-[#6b7280]">
+                  前回 {section.previous_count} / 今回 {section.current_count}
+                </p>
+              </div>
+              {section.added.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-xs font-bold text-[#24613f]">追加</p>
+                  <ul className="mt-1 space-y-1 text-sm leading-6 text-[#24613f]">
+                    {section.added.slice(0, 5).map((item) => (
+                      <li key={item}>+ {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {section.removed.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-xs font-bold text-[#9f352c]">前回のみ</p>
+                  <ul className="mt-1 space-y-1 text-sm leading-6 text-[#9f352c]">
+                    {section.removed.slice(0, 5).map((item) => (
+                      <li key={item}>- {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type DocumentReviewClientProps = {
   canAssignTeamTasks: boolean;
+  canUseDocumentDiff: boolean;
   canUseSharedLedger: boolean;
   documentId: string;
 };
 
 export default function DocumentReviewClient({
   canAssignTeamTasks,
+  canUseDocumentDiff,
   canUseSharedLedger,
   documentId,
 }: DocumentReviewClientProps) {
@@ -290,6 +554,9 @@ export default function DocumentReviewClient({
   const [isApproving, setIsApproving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDiffLoading, setIsDiffLoading] = useState(false);
+  const [documentDiff, setDocumentDiff] = useState<DocumentDiffPayload | null>(null);
+  const [diffError, setDiffError] = useState("");
   const [createdTasks, setCreatedTasks] = useState<Array<{ id: string; title: string }>>([]);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
@@ -298,6 +565,7 @@ export default function DocumentReviewClient({
   const loadReview = useCallback(async () => {
     setIsLoading(true);
     setError("");
+    setDiffError("");
     try {
       const result = await fetchJson<ApiItem<ReviewPayload>>(
         `/api/documents/${documentId}/review`
@@ -306,12 +574,33 @@ export default function DocumentReviewClient({
       setDraft(buildInitialDraft(result.data));
       setSelectedAssetIds(result.data.assets.map((asset) => asset.id));
       setSelectedFileId(result.data.files[0]?.id ?? null);
+
+      if (canUseDocumentDiff) {
+        setIsDiffLoading(true);
+        try {
+          const diffResult = await fetchJson<ApiItem<DocumentDiffPayload>>(
+            `/api/documents/${documentId}/diff`
+          );
+          setDocumentDiff(diffResult.data);
+        } catch (diffLoadError) {
+          setDocumentDiff(null);
+          setDiffError(
+            diffLoadError instanceof Error
+              ? diffLoadError.message
+              : "差分の読み込みに失敗しました"
+          );
+        } finally {
+          setIsDiffLoading(false);
+        }
+      } else {
+        setDocumentDiff(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
       setIsLoading(false);
     }
-  }, [documentId]);
+  }, [canUseDocumentDiff, documentId]);
 
   useEffect(() => {
     void loadReview();
@@ -728,6 +1017,13 @@ export default function DocumentReviewClient({
               </div>
             </div>
           ) : null}
+
+          <DocumentDiffPanel
+            canUseDocumentDiff={canUseDocumentDiff}
+            diff={documentDiff}
+            error={diffError}
+            isLoading={isDiffLoading}
+          />
 
           <div className="border border-[#d9ded3] bg-white p-4">
             <h3 className="text-base font-bold">書類基本情報</h3>

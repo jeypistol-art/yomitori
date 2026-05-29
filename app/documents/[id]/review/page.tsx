@@ -37,6 +37,10 @@ export default async function DocumentReviewPage({ params }: PageProps) {
     currentOrganization.plan_code,
     "assignee_workflow"
   );
+  const canUseDocumentDiff = canUseFeature(
+    currentOrganization.plan_code,
+    "document_diff"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-5 text-[#1f2933] sm:px-6 lg:px-8">
@@ -63,6 +67,7 @@ export default async function DocumentReviewPage({ params }: PageProps) {
 
         <DocumentReviewClient
           canAssignTeamTasks={canAssignTeamTasks}
+          canUseDocumentDiff={canUseDocumentDiff}
           canUseSharedLedger={canUseSharedLedger}
           documentId={id}
         />

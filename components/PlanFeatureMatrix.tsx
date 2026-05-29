@@ -30,14 +30,6 @@ type PlannedFeatureRoadmapItem = {
 
 const plannedFeatureRoadmap: PlannedFeatureRoadmapItem[] = [
   {
-    featureKey: "document_diff",
-    phase: "設計中",
-    focus:
-      "同じ管理対象・同じ書類種別の前回版と比較し、期限、金額、提出物、注意事項の変化を抽出します。",
-    outcome:
-      "更新案内や行政通知で「前回と何が変わったか」を確認でき、見落としを減らします。",
-  },
-  {
     featureKey: "branch_ledgers",
     phase: "要件整理",
     focus:
@@ -107,9 +99,9 @@ const featureDestinations: Record<
     status: "ready",
   },
   document_diff: {
-    href: "/unprocessed",
-    actionLabel: "下のロードマップで確認",
-    status: "planned",
+    href: "/documents/new",
+    actionLabel: "書類一覧へ",
+    status: "ready",
   },
   advanced_permissions: {
     href: "/team",

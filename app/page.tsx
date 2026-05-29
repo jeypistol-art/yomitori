@@ -68,7 +68,7 @@ const coreFeatures = [
   },
   {
     title: "差分・優先処理へ拡張",
-    body: "過去書類との差分や優先処理は、上位プラン価値として準備中です。",
+    body: "過去書類との差分確認に対応。優先処理などの上位運用も順次拡張します。",
     icon: GitCompareArrows,
   },
 ];
