@@ -1,6 +1,6 @@
 import { EXTRA_PACK_CATALOG, PLAN_CATALOG } from "@/lib/usage_catalog";
 
-const defaultContactEmail = "info@morimori-labo.monster";
+const defaultContactEmail = "info.yomitori@morimori-labo.monster";
 const defaultDisclosureText = "請求があった場合、遅滞なく開示します。";
 
 function readEnv(...keys: string[]) {
@@ -13,18 +13,6 @@ function readEnv(...keys: string[]) {
   return "";
 }
 
-function extractEmail(value: string | undefined) {
-  if (!value) {
-    return "";
-  }
-  const bracketed = value.match(/<([^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)>/);
-  if (bracketed?.[1]) {
-    return bracketed[1];
-  }
-  const plain = value.match(/[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+/);
-  return plain?.[0] ?? "";
-}
-
 export function getLegalConfig() {
   const contactEmail =
     readEnv(
@@ -32,7 +20,6 @@ export function getLegalConfig() {
       "NEXT_PUBLIC_LEGAL_CONTACT_EMAIL",
       "NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL"
     ) ||
-    extractEmail(process.env.EMAIL_FROM) ||
     defaultContactEmail;
 
   return {
