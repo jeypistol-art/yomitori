@@ -23,6 +23,7 @@ npm run dev
 
 - `migrations/001_initial.sql`
 - `docs/`
+- `docs/YOMITORI_DocuTask_production_readiness_checklist.md`
 - `lib/db.ts`
 - `lib/openai_client.ts`
 - `lib/r2_documents.ts`
