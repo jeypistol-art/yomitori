@@ -66,6 +66,9 @@ export async function POST(request: Request) {
 
     const body = await readJson(request);
     const parentId = normalizeNullableText(body.parent_id);
+    if (parentId) {
+      requireFeatureAccess(currentOrganization.plan_code, "branch_ledgers");
+    }
     if (
       parentId &&
       !(await assertManagedAssetBelongsToOrganization(

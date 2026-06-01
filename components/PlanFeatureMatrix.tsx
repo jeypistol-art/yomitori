@@ -30,14 +30,6 @@ type PlannedFeatureRoadmapItem = {
 
 const plannedFeatureRoadmap: PlannedFeatureRoadmapItem[] = [
   {
-    featureKey: "branch_ledgers",
-    phase: "要件整理",
-    focus:
-      "施設、店舗、拠点ごとに台帳、書類、未処理タスクを絞り込める構成にします。",
-    outcome:
-      "複数拠点を持つ管理会社でも、担当範囲ごとの確認と引き継ぎがしやすくなります。",
-  },
-  {
     featureKey: "api_webhooks",
     phase: "個別要件確認",
     focus:
@@ -102,8 +94,8 @@ const featureDestinations: Record<
   },
   branch_ledgers: {
     href: "/master-data",
-    actionLabel: "下のロードマップで確認",
-    status: "planned",
+    actionLabel: "台帳設定へ",
+    status: "ready",
   },
   priority_processing: {
     href: "/unprocessed",

@@ -35,6 +35,38 @@ async function readJson(request: Request) {
   }
 }
 
+async function assertParentDoesNotCreateCycle(args: {
+  organizationId: string;
+  assetId: string;
+  parentId: string;
+}) {
+  const result = await query<{ id: string }>(
+    `WITH RECURSIVE descendants AS (
+       SELECT id
+       FROM managed_assets
+       WHERE organization_id = $1
+         AND parent_id = $2
+         AND deleted_at IS NULL
+       UNION ALL
+       SELECT ma.id
+       FROM managed_assets ma
+       JOIN descendants d
+         ON ma.parent_id = d.id
+       WHERE ma.organization_id = $1
+         AND ma.deleted_at IS NULL
+     )
+     SELECT id
+     FROM descendants
+     WHERE id = $3
+     LIMIT 1`,
+    [args.organizationId, args.assetId, args.parentId]
+  );
+
+  if (result.rows[0]) {
+    throw new ApiError(400, "parent_id cannot be a descendant");
+  }
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
@@ -44,8 +76,18 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const body = await readJson(request);
     const parentId = normalizeNullableText(body.parent_id);
+    if (parentId) {
+      requireFeatureAccess(currentOrganization.plan_code, "branch_ledgers");
+    }
     if (parentId === id) {
       throw new ApiError(400, "parent_id cannot be self");
+    }
+    if (parentId) {
+      await assertParentDoesNotCreateCycle({
+        organizationId: currentOrganization.organization_id,
+        assetId: id,
+        parentId,
+      });
     }
     if (
       parentId &&

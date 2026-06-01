@@ -108,7 +108,7 @@ export const FEATURE_GATES: FeatureGate[] = [
   {
     key: "branch_ledgers",
     label: "拠点別台帳",
-    description: "施設、店舗、拠点ごとに台帳と未処理状況を整理します。",
+    description: "施設、店舗、テナントを上位拠点に紐づけ、台帳を拠点別に整理します。",
     minimumPlan: "pro",
     valueTheme: "trust",
   },

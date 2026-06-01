@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Building2,
+  GitBranch,
+  LockKeyhole,
   Pencil,
   Plus,
   RefreshCw,
@@ -50,6 +52,8 @@ const assetTypeLabels: Record<string, string> = {
   other: "その他",
 };
 
+const branchParentAssetTypes = new Set(["property", "facility", "store", "office"]);
+
 const counterpartyTypeLabels: Record<string, string> = {
   municipality: "行政・自治体",
   tenant: "テナント",
@@ -96,8 +100,13 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-export default function MasterDataClient() {
+export default function MasterDataClient({
+  canUseBranchLedgers,
+}: {
+  canUseBranchLedgers: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<"assets" | "counterparties">("assets");
+  const [assetView, setAssetView] = useState<"list" | "branch">("list");
   const [assets, setAssets] = useState<ManagedAsset[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [assetForm, setAssetForm] = useState(emptyAssetForm);
@@ -113,6 +122,52 @@ export default function MasterDataClient() {
     () => Object.entries(assetTypeLabels),
     []
   );
+  const assetById = useMemo(
+    () => new Map(assets.map((asset) => [asset.id, asset])),
+    [assets]
+  );
+  const descendantAssetIds = useMemo(() => {
+    const descendants = new Set<string>();
+    if (!editingAssetId) {
+      return descendants;
+    }
+    const queue = [editingAssetId];
+    while (queue.length > 0) {
+      const parentId = queue.shift();
+      for (const asset of assets) {
+        if (asset.parent_id === parentId && !descendants.has(asset.id)) {
+          descendants.add(asset.id);
+          queue.push(asset.id);
+        }
+      }
+    }
+    return descendants;
+  }, [assets, editingAssetId]);
+  const branchParentOptions = useMemo(
+    () =>
+      assets.filter(
+        (asset) =>
+          asset.id !== editingAssetId &&
+          !descendantAssetIds.has(asset.id) &&
+          branchParentAssetTypes.has(asset.asset_type)
+      ),
+    [assets, descendantAssetIds, editingAssetId]
+  );
+  const rootAssets = useMemo(
+    () =>
+      assets.filter((asset) => !asset.parent_id || !assetById.has(asset.parent_id)),
+    [assetById, assets]
+  );
+  const childAssetsByParentId = useMemo(() => {
+    const grouped = new Map<string, ManagedAsset[]>();
+    for (const asset of assets) {
+      if (!asset.parent_id || !assetById.has(asset.parent_id)) {
+        continue;
+      }
+      grouped.set(asset.parent_id, [...(grouped.get(asset.parent_id) ?? []), asset]);
+    }
+    return grouped;
+  }, [assetById, assets]);
   const counterpartyOptions = useMemo(
     () => Object.entries(counterpartyTypeLabels),
     []
@@ -138,6 +193,12 @@ export default function MasterDataClient() {
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!canUseBranchLedgers) {
+      setAssetView("list");
+    }
+  }, [canUseBranchLedgers]);
 
   function resetAssetForm() {
     setAssetForm(emptyAssetForm);
@@ -340,6 +401,39 @@ export default function MasterDataClient() {
                 ))}
               </select>
             </label>
+            {canUseBranchLedgers ? (
+              <label className="block text-sm font-semibold">
+                上位管理対象
+                <select
+                  value={assetForm.parent_id}
+                  onChange={(event) =>
+                    setAssetForm((form) => ({
+                      ...form,
+                      parent_id: event.target.value,
+                    }))
+                  }
+                  className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
+                >
+                  <option value="">設定なし</option>
+                  {branchParentOptions.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {asset.name}
+                      {asset.code ? ` / ${asset.code}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs leading-5 text-[#6b7280]">
+                  施設、店舗、テナントなどを上位拠点に紐づけて整理できます。
+                </span>
+              </label>
+            ) : (
+              <div className="rounded-md border border-[#e1e6dc] bg-[#f4f5f1] px-3 py-3 text-sm leading-6 text-[#5f6b5f]">
+                <div className="flex gap-2">
+                  <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>上位管理対象の紐づけはProプラン以上で利用できます。</span>
+                </div>
+              </div>
+            )}
             <label className="block text-sm font-semibold">
               名称
               <input
@@ -536,15 +630,38 @@ export default function MasterDataClient() {
                 : `${counterparties.length}件`}
             </p>
           </div>
-          <button
-            type="button"
-            title="再読み込み"
-            onClick={loadAll}
-            className="flex h-10 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-semibold text-[#2f5d50]"
-          >
-            <RefreshCw className="h-4 w-4" />
-            更新
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTab === "assets" && canUseBranchLedgers ? (
+              <div className="flex rounded-md border border-[#d9ded3] bg-[#f7f8f5] p-1">
+                {[
+                  ["list", "一覧"],
+                  ["branch", "拠点別"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setAssetView(value as "list" | "branch")}
+                    className={`h-9 rounded px-3 text-sm font-bold ${
+                      assetView === value
+                        ? "bg-white text-[#1f2933] shadow-sm"
+                        : "text-[#5f6b5f]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              title="再読み込み"
+              onClick={loadAll}
+              className="flex h-10 items-center gap-2 rounded-md border border-[#d9ded3] px-3 text-sm font-semibold text-[#2f5d50]"
+            >
+              <RefreshCw className="h-4 w-4" />
+              更新
+            </button>
+          </div>
         </div>
 
         {message ? (
@@ -567,42 +684,53 @@ export default function MasterDataClient() {
             <div className="space-y-3">
               {assets.length === 0 ? (
                 <EmptyState text="管理対象は未登録です" />
+              ) : canUseBranchLedgers && assetView === "branch" ? (
+                rootAssets.map((asset) => {
+                  const children = childAssetsByParentId.get(asset.id) ?? [];
+                  return (
+                    <div key={asset.id} className="border border-[#e1e6dc]">
+                      <div className="border-b border-[#edf0e8] bg-[#fbfcf8] p-4">
+                        <div className="mb-3 flex items-center gap-2 text-xs font-bold text-[#2f5d50]">
+                          <GitBranch className="h-3.5 w-3.5" />
+                          {children.length}件の下位管理対象
+                        </div>
+                        <AssetCard
+                          asset={asset}
+                          onDelete={() => void deleteAsset(asset.id)}
+                          onEdit={() => editAsset(asset)}
+                        />
+                      </div>
+                      {children.length > 0 ? (
+                        <div className="space-y-3 p-4">
+                          {children.map((child) => (
+                            <AssetCard
+                              key={child.id}
+                              asset={child}
+                              parent={asset}
+                              onDelete={() => void deleteAsset(child.id)}
+                              onEdit={() => editAsset(child)}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="px-4 py-4 text-sm text-[#6b7280]">
+                          下位管理対象は未設定です。
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 assets.map((asset) => (
-                  <div
+                  <AssetCard
                     key={asset.id}
-                    className="grid gap-4 border border-[#e1e6dc] p-4 md:grid-cols-[1fr_auto]"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
-                          {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
-                        </span>
-                        {asset.code ? (
-                          <span className="font-mono text-xs text-[#6b7280]">
-                            {asset.code}
-                          </span>
-                        ) : null}
-                      </div>
-                      <h3 className="mt-2 break-words text-base font-bold">
-                        {asset.name}
-                      </h3>
-                      {asset.address ? (
-                        <p className="mt-1 break-words text-sm text-[#4b5563]">
-                          {asset.address}
-                        </p>
-                      ) : null}
-                      {asset.memo ? (
-                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[#6b7280]">
-                          {asset.memo}
-                        </p>
-                      ) : null}
-                    </div>
-                    <RowActions
-                      onEdit={() => editAsset(asset)}
-                      onDelete={() => void deleteAsset(asset.id)}
-                    />
-                  </div>
+                    asset={asset}
+                    parent={
+                      asset.parent_id ? assetById.get(asset.parent_id) : undefined
+                    }
+                    onDelete={() => void deleteAsset(asset.id)}
+                    onEdit={() => editAsset(asset)}
+                  />
                 ))
               )}
             </div>
@@ -657,6 +785,53 @@ export default function MasterDataClient() {
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function AssetCard({
+  asset,
+  onDelete,
+  onEdit,
+  parent,
+}: {
+  asset: ManagedAsset;
+  onDelete: () => void;
+  onEdit: () => void;
+  parent?: ManagedAsset;
+}) {
+  return (
+    <div className="grid gap-4 border border-[#e1e6dc] bg-white p-4 md:grid-cols-[1fr_auto]">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
+            {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
+          </span>
+          {asset.code ? (
+            <span className="font-mono text-xs text-[#6b7280]">
+              {asset.code}
+            </span>
+          ) : null}
+          {parent ? (
+            <span className="inline-flex items-center gap-1 rounded bg-[#f3f4f6] px-2 py-1 text-xs font-bold text-[#4b5563]">
+              <GitBranch className="h-3.5 w-3.5" />
+              {parent.name}
+            </span>
+          ) : null}
+        </div>
+        <h3 className="mt-2 break-words text-base font-bold">{asset.name}</h3>
+        {asset.address ? (
+          <p className="mt-1 break-words text-sm text-[#4b5563]">
+            {asset.address}
+          </p>
+        ) : null}
+        {asset.memo ? (
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-[#6b7280]">
+            {asset.memo}
+          </p>
+        ) : null}
+      </div>
+      <RowActions onDelete={onDelete} onEdit={onEdit} />
     </div>
   );
 }

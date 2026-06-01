@@ -28,6 +28,10 @@ export default async function MasterDataPage() {
     currentOrganization.plan_code,
     "shared_ledger"
   );
+  const canUseBranchLedgers = canUseFeature(
+    currentOrganization.plan_code,
+    "branch_ledgers"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -57,7 +61,15 @@ export default async function MasterDataPage() {
             currentPlanCode={currentOrganization.plan_code}
             featureKey="shared_ledger"
           />
-          {canUseSharedLedger ? <MasterDataClient /> : null}
+          {canUseSharedLedger ? (
+            <>
+              <FeatureGateNotice
+                currentPlanCode={currentOrganization.plan_code}
+                featureKey="branch_ledgers"
+              />
+              <MasterDataClient canUseBranchLedgers={canUseBranchLedgers} />
+            </>
+          ) : null}
         </div>
       </div>
     </main>
