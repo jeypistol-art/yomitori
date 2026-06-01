@@ -33,6 +33,7 @@ export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number]["event"];
 
 type WebhookEndpointRow = {
   id: string;
+  organization_id?: string;
   name: string;
   url: string;
   secret: string;
@@ -43,7 +44,7 @@ type WebhookDeliveryRow = {
   organization_id: string;
   endpoint_id: string;
   event_id: string;
-  event_type: WebhookEventType;
+  event_type: WebhookEventType | "webhook.test";
   payload: unknown;
   attempt_count: number;
   max_attempts: number;
@@ -63,6 +64,9 @@ export type ProcessWebhookDeliveriesResult = {
     error: string | null;
   }>;
 };
+
+export type WebhookDeliveryAttemptResult =
+  ProcessWebhookDeliveriesResult["deliveries"][number];
 
 const eventTypeSet = new Set<string>(
   WEBHOOK_EVENT_TYPES.map((item) => item.event)
@@ -222,6 +226,10 @@ function nextAttemptDelayMinutes(attemptCount: number) {
   return [5, 15, 60, 240][Math.min(attemptCount, 3)] ?? 240;
 }
 
+function generateTestEventId() {
+  return `evt_ydt_test_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
 async function sendDelivery(delivery: WebhookDeliveryRow) {
   const body = jsonString(delivery.payload);
   const timestamp = new Date().toISOString();
@@ -283,84 +291,9 @@ export async function processQueuedWebhookDeliveries(args: { limit?: number } = 
     const nextAttemptCount = delivery.attempt_count + 1;
     try {
       const response = await sendDelivery(delivery);
-      if (response.ok) {
-        await query(
-          `UPDATE webhook_deliveries
-           SET status = 'succeeded',
-               attempt_count = $2,
-               last_attempt_at = now(),
-               delivered_at = now(),
-               response_status = $3,
-               response_body = $4,
-               error_message = NULL,
-               updated_at = now()
-           WHERE id = $1`,
-          [delivery.id, nextAttemptCount, response.status, response.body]
-        );
-        deliveries.push({
-          id: delivery.id,
-          status: "succeeded",
-          response_status: response.status,
-          error: null,
-        });
-      } else {
-        const isDead = nextAttemptCount >= delivery.max_attempts;
-        await query(
-          `UPDATE webhook_deliveries
-           SET status = $2,
-               attempt_count = $3,
-               last_attempt_at = now(),
-               next_attempt_at = now() + ($4::int * INTERVAL '1 minute'),
-               response_status = $5,
-               response_body = $6,
-               error_message = $7,
-               updated_at = now()
-           WHERE id = $1`,
-          [
-            delivery.id,
-            isDead ? "dead" : "failed",
-            nextAttemptCount,
-            nextAttemptDelayMinutes(nextAttemptCount),
-            response.status,
-            response.body,
-            `HTTP ${response.status}`,
-          ]
-        );
-        deliveries.push({
-          id: delivery.id,
-          status: isDead ? "dead" : "failed",
-          response_status: response.status,
-          error: `HTTP ${response.status}`,
-        });
-      }
+      deliveries.push(await persistDeliveryResponse(delivery, nextAttemptCount, response));
     } catch (error) {
-      const isDead = nextAttemptCount >= delivery.max_attempts;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      await query(
-        `UPDATE webhook_deliveries
-         SET status = $2,
-             attempt_count = $3,
-             last_attempt_at = now(),
-             next_attempt_at = now() + ($4::int * INTERVAL '1 minute'),
-             response_status = NULL,
-             response_body = NULL,
-             error_message = $5,
-             updated_at = now()
-         WHERE id = $1`,
-        [
-          delivery.id,
-          isDead ? "dead" : "failed",
-          nextAttemptCount,
-          nextAttemptDelayMinutes(nextAttemptCount),
-          errorMessage,
-        ]
-      );
-      deliveries.push({
-        id: delivery.id,
-        status: isDead ? "dead" : "failed",
-        response_status: null,
-        error: errorMessage,
-      });
+      deliveries.push(await persistDeliveryError(delivery, nextAttemptCount, error));
     }
   }
 
@@ -371,4 +304,172 @@ export async function processQueuedWebhookDeliveries(args: { limit?: number } = 
     dead: deliveries.filter((item) => item.status === "dead").length,
     deliveries,
   } satisfies ProcessWebhookDeliveriesResult;
+}
+
+async function persistDeliveryResponse(
+  delivery: WebhookDeliveryRow,
+  attemptCount: number,
+  response: { ok: boolean; status: number; body: string }
+): Promise<WebhookDeliveryAttemptResult> {
+  if (response.ok) {
+    await query(
+      `UPDATE webhook_deliveries
+       SET status = 'succeeded',
+           attempt_count = $2,
+           last_attempt_at = now(),
+           delivered_at = now(),
+           response_status = $3,
+           response_body = $4,
+           error_message = NULL,
+           updated_at = now()
+       WHERE id = $1`,
+      [delivery.id, attemptCount, response.status, response.body]
+    );
+    return {
+      id: delivery.id,
+      status: "succeeded",
+      response_status: response.status,
+      error: null,
+    };
+  }
+
+  const isDead = attemptCount >= delivery.max_attempts;
+  await query(
+    `UPDATE webhook_deliveries
+     SET status = $2,
+         attempt_count = $3,
+         last_attempt_at = now(),
+         next_attempt_at = now() + ($4::int * INTERVAL '1 minute'),
+         response_status = $5,
+         response_body = $6,
+         error_message = $7,
+         updated_at = now()
+     WHERE id = $1`,
+    [
+      delivery.id,
+      isDead ? "dead" : "failed",
+      attemptCount,
+      nextAttemptDelayMinutes(attemptCount),
+      response.status,
+      response.body,
+      `HTTP ${response.status}`,
+    ]
+  );
+  return {
+    id: delivery.id,
+    status: isDead ? "dead" : "failed",
+    response_status: response.status,
+    error: `HTTP ${response.status}`,
+  };
+}
+
+async function persistDeliveryError(
+  delivery: WebhookDeliveryRow,
+  attemptCount: number,
+  error: unknown
+): Promise<WebhookDeliveryAttemptResult> {
+  const isDead = attemptCount >= delivery.max_attempts;
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  await query(
+    `UPDATE webhook_deliveries
+     SET status = $2,
+         attempt_count = $3,
+         last_attempt_at = now(),
+         next_attempt_at = now() + ($4::int * INTERVAL '1 minute'),
+         response_status = NULL,
+         response_body = NULL,
+         error_message = $5,
+         updated_at = now()
+     WHERE id = $1`,
+    [
+      delivery.id,
+      isDead ? "dead" : "failed",
+      attemptCount,
+      nextAttemptDelayMinutes(attemptCount),
+      errorMessage,
+    ]
+  );
+  return {
+    id: delivery.id,
+    status: isDead ? "dead" : "failed",
+    response_status: null,
+    error: errorMessage,
+  };
+}
+
+export async function sendWebhookTestDelivery(args: {
+  organizationId: string;
+  endpointId: string;
+}) {
+  const endpoint = await query<WebhookEndpointRow>(
+    `SELECT
+       id,
+       organization_id,
+       name,
+       url,
+       secret
+     FROM webhook_endpoints
+     WHERE organization_id = $1
+       AND id = $2
+       AND deleted_at IS NULL`,
+    [args.organizationId, args.endpointId]
+  );
+
+  const row = endpoint.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const eventId = generateTestEventId();
+  const payload = {
+    id: eventId,
+    type: "webhook.test",
+    created_at: new Date().toISOString(),
+    organization_id: args.organizationId,
+    data: {
+      message: "YOMITORI DocuTask webhook test",
+      endpoint_id: row.id,
+      endpoint_name: row.name,
+    },
+  };
+
+  const delivery = await query<WebhookDeliveryRow>(
+    `INSERT INTO webhook_deliveries (
+       organization_id,
+       endpoint_id,
+       event_id,
+       event_type,
+       payload,
+       status,
+       max_attempts,
+       next_attempt_at
+     )
+     VALUES ($1, $2, $3, 'webhook.test', $4::jsonb, 'queued', 1, now())
+     RETURNING
+       id,
+       organization_id,
+       endpoint_id,
+       event_id,
+       event_type,
+       payload,
+       attempt_count,
+       max_attempts,
+       $5::text AS url,
+       $6::text AS secret`,
+    [args.organizationId, row.id, eventId, jsonString(payload), row.url, row.secret]
+  );
+
+  const deliveryRow = delivery.rows[0];
+  const attempt = await sendDelivery(deliveryRow)
+    .then((response) =>
+      persistDeliveryResponse(deliveryRow, deliveryRow.attempt_count + 1, response)
+    )
+    .catch((error) =>
+      persistDeliveryError(deliveryRow, deliveryRow.attempt_count + 1, error)
+    );
+
+  return {
+    event_id: eventId,
+    delivery: attempt,
+  };
 }

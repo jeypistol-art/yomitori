@@ -9,6 +9,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -248,6 +249,41 @@ export default function WebhookSettingsClient() {
     }
   }
 
+  async function testEndpoint(endpoint: WebhookEndpoint) {
+    setWorkingId(endpoint.id);
+    setError("");
+    setMessage("");
+    try {
+      const payload = await fetchJson<{
+        data: {
+          event_id: string;
+          delivery: {
+            status: string;
+            response_status: number | null;
+            error: string | null;
+          };
+        };
+      }>(`/api/webhook-endpoints/${endpoint.id}/test`, { method: "POST" });
+      const delivery = payload.data.delivery;
+      if (delivery.status === "succeeded") {
+        setMessage(
+          `テスト送信に成功しました。HTTP ${delivery.response_status ?? "-"}`
+        );
+      } else {
+        setError(
+          `テスト送信に失敗しました。${
+            delivery.error ?? "送信先の応答を確認してください"
+          }`
+        );
+      }
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "テスト送信に失敗しました");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
   async function retryDelivery(delivery: WebhookDelivery) {
     setWorkingId(delivery.id);
     setError("");
@@ -475,6 +511,19 @@ export default function WebhookSettingsClient() {
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        title="テスト送信"
+                        disabled={workingId === endpoint.id}
+                        onClick={() => void testEndpoint(endpoint)}
+                        className="flex h-9 w-9 items-center justify-center rounded-md border border-[#d9ded3] text-[#2f5d50] disabled:opacity-60"
+                      >
+                        {workingId === endpoint.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </button>
                       <button
                         type="button"
                         title="編集"
