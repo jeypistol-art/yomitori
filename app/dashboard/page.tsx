@@ -8,6 +8,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  Webhook,
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -17,6 +18,7 @@ import LogoutButton from "@/components/LogoutButton";
 import PlanUpgradePanel from "@/components/PlanUpgradePanel";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
 import { getCurrentOrganization } from "@/lib/current_organization";
+import { canUseFeature } from "@/lib/feature_gates";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -27,6 +29,10 @@ export default async function DashboardPage() {
   if (!currentOrganization) {
     redirect("/login");
   }
+  const canUseApiWebhooks = canUseFeature(
+    currentOrganization.plan_code,
+    "api_webhooks"
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-6 py-8 text-[#1f2933]">
@@ -88,6 +94,15 @@ export default async function DashboardPage() {
               <Database className="h-4 w-4" />
               台帳設定
             </Link>
+            {canUseApiWebhooks ? (
+              <Link
+                href="/integrations"
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
+              >
+                <Webhook className="h-4 w-4" />
+                API/Webhook
+              </Link>
+            ) : null}
             <Link
               href="/documents/new"
               className="inline-flex h-10 items-center gap-2 rounded-md bg-[#2f5d50] px-4 text-sm font-semibold text-white"
@@ -122,6 +137,9 @@ export default async function DashboardPage() {
             ["登録済み書類", "登録済み書類の一覧", "/documents/new"],
             ["利用状況", "月次上限・追加パック・プラン", "/usage"],
             ["監査ログ", "承認・削除・通知の証跡", "/audit-logs"],
+            ...(canUseApiWebhooks
+              ? [["API/Webhook", "外部システム連携の仕様", "/integrations"]]
+              : []),
           ].map(([title, body, href]) => (
             <Link
               key={title}

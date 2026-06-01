@@ -129,7 +129,7 @@ export const FEATURE_GATES: FeatureGate[] = [
   {
     key: "api_webhooks",
     label: "API/Webhook",
-    description: "既存システムへ書類、タスク、通知結果を連携します。",
+    description: "書類、タスク、通知結果を外部システムへ連携する仕様を確認できます。",
     minimumPlan: "enterprise",
     valueTheme: "embedded",
   },

@@ -1,0 +1,239 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BellRing,
+  ChevronLeft,
+  ClipboardCheck,
+  FileText,
+  KeyRound,
+  RotateCcw,
+  ShieldCheck,
+  Webhook,
+} from "lucide-react";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import FeatureGateNotice from "@/components/FeatureGateNotice";
+import HeaderAccountActions from "@/components/HeaderAccountActions";
+import { authOptions } from "@/lib/auth_options";
+import { getCurrentOrganization } from "@/lib/current_organization";
+import { getEnterpriseContactPageHref } from "@/lib/enterprise_contact";
+import { canUseFeature } from "@/lib/feature_gates";
+
+export const metadata: Metadata = {
+  title: "API/Webhook",
+};
+
+const webhookEvents = [
+  {
+    event: "document.created",
+    title: "書類登録",
+    body: "PDF、画像、メール本文が登録された時点で通知します。",
+    icon: FileText,
+  },
+  {
+    event: "document.extraction_succeeded",
+    title: "AI抽出完了",
+    body: "要約、期限、タスク候補の抽出が成功した時点で通知します。",
+    icon: Webhook,
+  },
+  {
+    event: "document.approved",
+    title: "承認完了",
+    body: "人間の確認を経て、抽出結果が確定した時点で通知します。",
+    icon: ShieldCheck,
+  },
+  {
+    event: "task.created",
+    title: "タスク作成",
+    body: "承認結果からタスクが作成された時点で通知します。",
+    icon: ClipboardCheck,
+  },
+  {
+    event: "reminder.sent",
+    title: "リマインド送信",
+    body: "担当者へメール通知が送信された時点で通知します。",
+    icon: BellRing,
+  },
+];
+
+const payloadExample = `{
+  "id": "evt_ydt_01H...",
+  "type": "document.approved",
+  "created_at": "2026-06-01T09:00:00.000Z",
+  "organization_id": "org_...",
+  "data": {
+    "document": {
+      "id": "doc_...",
+      "title": "防火対象物定期点検報告書の提出について",
+      "document_type": "municipal_notice",
+      "status": "approved",
+      "due_date": "2026-06-30"
+    },
+    "tasks": [
+      {
+        "id": "task_...",
+        "title": "報告書を提出する",
+        "due_date": "2026-06-30",
+        "priority": "high"
+      }
+    ]
+  }
+}`;
+
+export default async function IntegrationsPage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const currentOrganization = await getCurrentOrganization(session.user.id);
+  if (!currentOrganization) {
+    redirect("/login");
+  }
+  const canUseApiWebhooks = canUseFeature(
+    currentOrganization.plan_code,
+    "api_webhooks"
+  );
+  const enterpriseContactHref = getEnterpriseContactPageHref();
+
+  return (
+    <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <Link
+              href="/dashboard"
+              className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-[#2f5d50]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              ダッシュボード
+            </Link>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2f5d50]">
+              Integrations
+            </p>
+            <h1 className="mt-1 text-3xl font-bold">API/Webhook</h1>
+          </div>
+          <HeaderAccountActions
+            organizationName={currentOrganization.organization_name}
+            role={currentOrganization.role}
+          />
+        </header>
+
+        <div className="space-y-5">
+          <FeatureGateNotice
+            currentPlanCode={currentOrganization.plan_code}
+            featureKey="api_webhooks"
+          />
+
+          {canUseApiWebhooks ? (
+            <>
+              <section className="border border-[#d9ded3] bg-white">
+                <div className="border-b border-[#e5e9df] px-5 py-4">
+                  <p className="text-sm font-bold text-[#2f5d50]">
+                    Webhook Events
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold">
+                    外部システムへ通知するイベント
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                    YOMITORI DocuTask上で発生した業務イベントを、管理会社側の既存システム、チャット、台帳、BIツールへ渡すための連携仕様です。
+                  </p>
+                </div>
+                <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+                  {webhookEvents.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <article
+                        key={item.event}
+                        className="border border-[#e1e6dc] bg-[#fbfcf8] p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#edf2e8] text-[#2f5d50]">
+                            <Icon className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-mono text-xs font-bold text-[#2f5d50]">
+                              {item.event}
+                            </p>
+                            <h3 className="mt-1 break-words text-base font-bold">
+                              {item.title}
+                            </h3>
+                            <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                              {item.body}
+                            </p>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <section className="border border-[#d9ded3] bg-white">
+                  <div className="border-b border-[#e5e9df] px-5 py-4">
+                    <p className="text-sm font-bold text-[#2f5d50]">
+                      Payload
+                    </p>
+                    <h2 className="mt-1 text-xl font-bold">送信ペイロード例</h2>
+                  </div>
+                  <div className="p-5">
+                    <pre className="overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {payloadExample}
+                    </pre>
+                  </div>
+                </section>
+
+                <aside className="space-y-5">
+                  <section className="border border-[#d9ded3] bg-white p-5">
+                    <div className="flex items-start gap-3">
+                      <KeyRound className="mt-0.5 h-5 w-5 text-[#2f5d50]" />
+                      <div>
+                        <h2 className="text-base font-bold">署名検証</h2>
+                        <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                          `YDT-Signature`ヘッダーでHMAC-SHA256署名を付与する設計です。受信側は共有シークレットで本文改ざんを検証できます。
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="border border-[#d9ded3] bg-white p-5">
+                    <div className="flex items-start gap-3">
+                      <RotateCcw className="mt-0.5 h-5 w-5 text-[#2f5d50]" />
+                      <div>
+                        <h2 className="text-base font-bold">再送設計</h2>
+                        <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                          2xx以外の応答は失敗として記録し、初期導入時に決めた回数と間隔で再送します。失敗履歴は監査ログと合わせて確認できる構成にします。
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="border border-[#f0d6a8] bg-[#fff8eb] p-5">
+                    <p className="text-sm font-bold text-[#9a5b13]">
+                      導入時に決めること
+                    </p>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-[#4b5563]">
+                      <li>送信先URL</li>
+                      <li>通知するイベント種別</li>
+                      <li>共有シークレットと署名検証方法</li>
+                      <li>再送回数、再送間隔、失敗時の連絡先</li>
+                    </ul>
+                    <Link
+                      href={enterpriseContactHref}
+                      className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#9a5b13] px-3 text-sm font-bold text-white"
+                    >
+                      連携要件を相談する
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </section>
+                </aside>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </main>
+  );
+}
