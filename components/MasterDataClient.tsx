@@ -446,6 +446,9 @@ export default function MasterDataClient({
             </label>
             <label className="block text-sm font-semibold">
               コード
+              <span className="ml-1 text-xs font-normal text-[#6b7280]">
+                ※任意で重複のないIDを指定してください。空欄でも可
+              </span>
               <input
                 value={assetForm.code}
                 onChange={(event) =>
