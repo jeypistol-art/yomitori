@@ -4,6 +4,7 @@ import { ApiError, jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
 import { requireFeatureAccess } from "@/lib/feature_gates";
 import { requireOperationalWrite } from "@/lib/permissions";
+import { safeEnqueueWebhookEvent } from "@/lib/webhook_events";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -275,7 +276,13 @@ export async function POST(request: Request, context: RouteContext) {
       ]
     );
 
-    const createdTasks: Array<{ id: string; title: string }> = [];
+    const createdTasks: Array<{
+      id: string;
+      title: string;
+      due_date: string | null;
+      priority: string;
+      assignee_member_id: string | null;
+    }> = [];
     const fallbackDueDate = extractPrimaryDueDate(draft);
     if (body.create_tasks !== false) {
       for (const task of taskCandidates) {
@@ -298,7 +305,13 @@ export async function POST(request: Request, context: RouteContext) {
         const priority = priorityValue && taskPriorities.has(priorityValue) ? priorityValue : "normal";
         const assigneeId = normalizeText(task.assignee_member_id);
 
-        const created = await query<{ id: string; title: string }>(
+        const created = await query<{
+          id: string;
+          title: string;
+          due_date: string | null;
+          priority: string;
+          assignee_member_id: string | null;
+        }>(
           `INSERT INTO tasks (
              organization_id,
              document_id,
@@ -311,7 +324,12 @@ export async function POST(request: Request, context: RouteContext) {
              status
            )
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'todo')
-           RETURNING id, title`,
+           RETURNING
+             id,
+             title,
+             due_date::text AS due_date,
+             priority::text AS priority,
+             assignee_member_id`,
           [
             currentOrganization.organization_id,
             id,
@@ -403,6 +421,25 @@ export async function POST(request: Request, context: RouteContext) {
         }),
       ]
     );
+    await safeEnqueueWebhookEvent({
+      organizationId: currentOrganization.organization_id,
+      eventType: "document.approved",
+      data: {
+        document: approvedDocument.rows[0],
+        created_task_count: createdTasks.length,
+        tasks: createdTasks,
+      },
+    });
+    for (const task of createdTasks) {
+      await safeEnqueueWebhookEvent({
+        organizationId: currentOrganization.organization_id,
+        eventType: "task.created",
+        data: {
+          task,
+          document: approvedDocument.rows[0],
+        },
+      });
+    }
 
     return NextResponse.json({
       data: {

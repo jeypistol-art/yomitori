@@ -1,5 +1,6 @@
 import { escapeHtml, sendEmail } from "@/lib/email_delivery";
 import { query } from "@/lib/db";
+import { safeEnqueueWebhookEvent } from "@/lib/webhook_events";
 
 type DueReminderRow = {
   reminder_id: string;
@@ -296,6 +297,35 @@ export async function processDueReminders(
           }),
         ]
       );
+      await safeEnqueueWebhookEvent({
+        organizationId: reminder.organization_id,
+        eventType: "reminder.sent",
+        data: {
+          reminder: {
+            id: reminder.reminder_id,
+            channel: reminder.channel,
+            provider,
+            message_id: messageId,
+          },
+          task: {
+            id: reminder.task_id,
+            title: reminder.task_title,
+            due_date: reminder.task_due_date,
+            status: reminder.task_status,
+          },
+          document: reminder.document_id
+            ? {
+                id: reminder.document_id,
+                title: reminder.document_title,
+              }
+            : null,
+          recipient: {
+            member_id: reminder.recipient_member_id,
+            name: reminder.recipient_name,
+            email: reminder.recipient_email,
+          },
+        },
+      });
       processed.push({
         id: reminder.reminder_id,
         status: "sent",

@@ -17,6 +17,7 @@ import {
   type PreparedDocumentFile,
 } from "@/lib/r2_documents";
 import { consumeDocumentUsage, getOrCreateCurrentUsagePeriod } from "@/lib/usage_limits";
+import { safeEnqueueWebhookEvent } from "@/lib/webhook_events";
 
 type DocumentRow = {
   id: string;
@@ -376,6 +377,21 @@ export async function POST(request: Request) {
       planCode: currentOrganization.plan_code,
       memberId: currentOrganization.member_id,
       documentId,
+    });
+    await safeEnqueueWebhookEvent({
+      organizationId: currentOrganization.organization_id,
+      eventType: "document.created",
+      data: {
+        document: {
+          id: documentId,
+          title,
+          status: "uploaded",
+          source_type: sourceType,
+          file_count: storedFiles.length,
+          duplicate_count: duplicates.rows.length,
+        },
+        usage,
+      },
     });
 
     return NextResponse.json(

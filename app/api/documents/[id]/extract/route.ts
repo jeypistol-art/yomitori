@@ -5,6 +5,7 @@ import { requireBillingAccess } from "@/lib/billing_access";
 import { query } from "@/lib/db";
 import { runDocumentAiExtraction } from "@/lib/document_ai_extraction";
 import { requireOperationalWrite } from "@/lib/permissions";
+import { safeEnqueueWebhookEvent } from "@/lib/webhook_events";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -50,6 +51,16 @@ export async function POST(_request: Request, context: RouteContext) {
       organizationId: currentOrganization.organization_id,
       documentId: id,
       memberId: currentOrganization.member_id,
+    });
+    await safeEnqueueWebhookEvent({
+      organizationId: currentOrganization.organization_id,
+      eventType: "document.extraction_succeeded",
+      data: {
+        document: result.document,
+        extraction: {
+          id: result.extractionId,
+        },
+      },
     });
 
     return NextResponse.json({ data: result });

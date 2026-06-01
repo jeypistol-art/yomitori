@@ -15,6 +15,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
 import HeaderAccountActions from "@/components/HeaderAccountActions";
+import WebhookSettingsClient from "@/components/WebhookSettingsClient";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
 import { getEnterpriseContactPageHref } from "@/lib/enterprise_contact";
@@ -128,6 +129,8 @@ export default async function IntegrationsPage() {
 
           {canUseApiWebhooks ? (
             <>
+              <WebhookSettingsClient />
+
               <section className="border border-[#d9ded3] bg-white">
                 <div className="border-b border-[#e5e9df] px-5 py-4">
                   <p className="text-sm font-bold text-[#2f5d50]">

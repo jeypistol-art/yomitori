@@ -4,6 +4,7 @@ import { default as handler } from "./.open-next/worker.js";
 type WorkerEnv = Record<string, unknown> & {
   APP_BASE_URL?: string;
   NEXTAUTH_URL?: string;
+  WEBHOOK_JOB_BATCH_SIZE?: string;
   NOTIFICATION_JOB_BATCH_SIZE?: string;
   NOTIFICATION_JOB_SECRET?: string;
 };
@@ -54,6 +55,36 @@ async function runReminderJob(env: WorkerEnv, ctx: WorkerExecutionContext) {
   console.info(`[cron:send-reminders] completed: ${body}`);
 }
 
+async function runWebhookJob(env: WorkerEnv, ctx: WorkerExecutionContext) {
+  const secret = env.NOTIFICATION_JOB_SECRET?.trim();
+  if (!secret) {
+    console.error("[cron:send-webhooks] NOTIFICATION_JOB_SECRET is not configured");
+    return;
+  }
+
+  const limit = env.WEBHOOK_JOB_BATCH_SIZE || "50";
+  const request = new Request(
+    `${getBaseUrl(env)}/api/jobs/send-webhooks?limit=${encodeURIComponent(limit)}`,
+    {
+      method: "POST",
+      headers: {
+        "x-job-secret": secret,
+        "user-agent": "YOMITORI DocuTask Cron",
+      },
+    }
+  );
+
+  const response = await handler.fetch(request, env, ctx);
+  const body = await response.text().catch(() => "");
+  if (!response.ok) {
+    throw new Error(
+      `[cron:send-webhooks] failed: ${response.status} ${response.statusText} ${body}`
+    );
+  }
+
+  console.info(`[cron:send-webhooks] completed: ${body}`);
+}
+
 const worker = {
   fetch: handler.fetch,
 
@@ -68,6 +99,7 @@ const worker = {
       ).toISOString()}`
     );
     ctx.waitUntil(runReminderJob(env, ctx));
+    ctx.waitUntil(runWebhookJob(env, ctx));
   },
 };
 
