@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import HeaderAccountActions from "@/components/HeaderAccountActions";
 import OnboardingClient from "@/components/OnboardingClient";
+import OperationalCheckGuide from "@/components/OperationalCheckGuide";
 import { authOptions } from "@/lib/auth_options";
 import { getCurrentOrganization } from "@/lib/current_organization";
 
@@ -46,7 +47,10 @@ export default async function SetupPage() {
           />
         </header>
 
-        <OnboardingClient />
+        <div className="space-y-6">
+          <OnboardingClient />
+          <OperationalCheckGuide />
+        </div>
       </div>
     </main>
   );
