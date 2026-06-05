@@ -167,7 +167,14 @@ function getNextActionHint(nextAction: NextAction) {
   return "";
 }
 
-function getDueDateClass(dueDate: string | null) {
+function isSettledDocumentStatus(status: string) {
+  return ["approved", "completed", "archived"].includes(status);
+}
+
+function getDueDateClass(dueDate: string | null, status: string) {
+  if (isSettledDocumentStatus(status)) {
+    return "bg-[#f3f4f6] text-[#6b7280]";
+  }
   if (!dueDate) {
     return "bg-[#fff8eb] text-[#9a5b13]";
   }
@@ -180,6 +187,10 @@ function getDueDateClass(dueDate: string | null) {
   return due < today
     ? "bg-[#fff5f2] text-[#b42318]"
     : "bg-[#fff8eb] text-[#9a5b13]";
+}
+
+function getDueDateLabel(status: string) {
+  return isSettledDocumentStatus(status) ? "書類期限" : "期限";
 }
 
 function DashboardQuickAdd({ onUploaded }: { onUploaded: () => Promise<void> }) {
@@ -491,9 +502,9 @@ export default function DashboardFocusClient() {
                       </span>
                       {document.due_date ? (
                         <span
-                          className={`rounded px-2 py-1 text-xs font-bold ${getDueDateClass(document.due_date)}`}
+                          className={`rounded px-2 py-1 text-xs font-bold ${getDueDateClass(document.due_date, document.status)}`}
                         >
-                          期限 {document.due_date}
+                          {getDueDateLabel(document.status)} {document.due_date}
                         </span>
                       ) : null}
                       <span className="text-xs font-semibold text-[#6b7280]">

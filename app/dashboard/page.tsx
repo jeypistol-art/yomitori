@@ -14,6 +14,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth_options";
 import DashboardFocusClient from "@/components/DashboardFocusClient";
+import DashboardTileMenuClient from "@/components/DashboardTileMenuClient";
 import LogoutButton from "@/components/LogoutButton";
 import PlanUpgradePanel from "@/components/PlanUpgradePanel";
 import UsageSummaryClient from "@/components/UsageSummaryClient";
@@ -128,31 +129,7 @@ export default async function DashboardPage() {
           <PlanUpgradePanel currentPlanCode={currentOrganization.plan_code} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            ["初期設定", "管理対象・担当者・通知設定の準備", "/setup"],
-            ["台帳設定", "管理対象と取引先", "/master-data"],
-            ["承認待ち", "AI抽出後、人間の確認が必要な書類", "/unprocessed"],
-            ["期限間近", "今週対応が必要なタスク", "/tasks?due=week"],
-            ["未処理一覧", "月次で残っている書類とタスク", "/unprocessed"],
-            ["リマインド", "予定されている通知", "/reminders"],
-            ["登録済み書類", "登録済み書類の一覧", "/documents/new"],
-            ["利用状況", "月次上限・追加パック・プラン", "/usage"],
-            ["監査ログ", "承認・削除・通知の証跡", "/audit-logs"],
-            ...(canManageApiWebhooks
-              ? [["API/Webhook", "外部システム連携の仕様", "/integrations"]]
-              : []),
-          ].map(([title, body, href]) => (
-            <Link
-              key={title}
-              href={href}
-              className="rounded-lg border border-[#d9ded3] bg-white p-5"
-            >
-              <h2 className="text-base font-bold">{title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#4b5563]">{body}</p>
-            </Link>
-          ))}
-        </div>
+        <DashboardTileMenuClient canManageApiWebhooks={canManageApiWebhooks} />
       </div>
     </main>
   );
