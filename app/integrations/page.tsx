@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import ApiKeySettingsClient from "@/components/ApiKeySettingsClient";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
 import HeaderAccountActions from "@/components/HeaderAccountActions";
 import WebhookSettingsClient from "@/components/WebhookSettingsClient";
@@ -95,6 +96,9 @@ YDT-Event-Id: evt_ydt_...
 YDT-Event-Type: document.approved
 YDT-Timestamp: 2026-06-01T09:00:00.000Z
 YDT-Signature: v1=<hex encoded hmac sha256>`;
+
+const apiAuthHeaderExample = `Authorization: Bearer ydt_live_...
+Accept: application/json`;
 
 const signatureExample = `署名対象文字列:
 <YDT-Timestamp>.<raw request body>
@@ -180,6 +184,8 @@ export default async function IntegrationsPage() {
 
           {canUseApiWebhooks ? (
             <>
+              <ApiKeySettingsClient />
+
               <WebhookSettingsClient />
 
               <section className="border border-[#d9ded3] bg-white">
@@ -221,6 +227,35 @@ export default async function IntegrationsPage() {
                       </article>
                     );
                   })}
+                </div>
+              </section>
+
+              <section className="border border-[#d9ded3] bg-white">
+                <div className="border-b border-[#e5e9df] px-5 py-4">
+                  <p className="text-sm font-bold text-[#2f5d50]">
+                    API Authentication
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold">APIキー認証</h2>
+                  <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                    外部APIはBearerトークンで認証する設計です。APIキーは作成直後のみ全文表示され、以後はハッシュ化された値だけを保持します。
+                  </p>
+                </div>
+                <div className="grid gap-5 p-5 lg:grid-cols-2">
+                  <section>
+                    <h3 className="text-base font-bold">認証ヘッダー</h3>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {apiAuthHeaderExample}
+                    </pre>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">運用ルール</h3>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-[#4b5563]">
+                      <li>連携先ごとにAPIキーを分けて発行します。</li>
+                      <li>不要になったキーは削除ではなく失効として記録します。</li>
+                      <li>キー本文は再表示できないため、紛失時は新規発行します。</li>
+                      <li>利用範囲はスコープで分け、必要最小限にします。</li>
+                    </ul>
+                  </section>
                 </div>
               </section>
 
