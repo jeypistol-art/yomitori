@@ -127,6 +127,20 @@ updated_since=2026-06-01T00:00:00.000Z
 Required scope:
 tasks:read`;
 
+const webhookDeliveriesEndpointExample = `GET /api/external/webhook-deliveries?limit=50
+Authorization: Bearer ydt_live_...
+
+Query:
+limit=1..100
+endpoint_id=<webhook_endpoint_id>
+status=queued|succeeded|failed|dead
+event_type=document.created|document.approved|task.created|reminder.sent|webhook.test
+before=2026-06-01T09:00:00.000Z
+updated_since=2026-06-01T00:00:00.000Z
+
+Required scope:
+webhooks:read`;
+
 const signatureExample = `署名対象文字列:
 <YDT-Timestamp>.<raw request body>
 
@@ -333,6 +347,25 @@ export default async function IntegrationsPage() {
                       <li>関連書類ID、書類タイトル、書類状態</li>
                       <li>担当者ID、担当者名、担当者メールアドレス</li>
                       <li>予定リマインド数、次回リマインド日時、作成日時、更新日時</li>
+                    </ul>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">
+                      Webhook配信履歴
+                    </h3>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {webhookDeliveriesEndpointExample}
+                    </pre>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">
+                      Webhook履歴APIの返却項目
+                    </h3>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-[#4b5563]">
+                      <li>配信ID、送信先ID、送信先名、イベントID、イベント種別</li>
+                      <li>配信状態、試行回数、最大試行回数、次回試行日時</li>
+                      <li>最終試行日時、配信成功日時、HTTPステータス、失敗理由</li>
+                      <li>作成日時、更新日時</li>
                     </ul>
                   </section>
                 </div>
