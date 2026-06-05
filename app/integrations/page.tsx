@@ -211,6 +211,9 @@ export default async function IntegrationsPage() {
               Integrations
             </p>
             <h1 className="mt-1 text-3xl font-bold">API/Webhook</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#4b5563]">
+              API/Webhookとは、ここで解析・登録した書類やタスクなどを、外部のシステムに連携するためのものです。詳細はシステム管理者とご相談の上、運用してください。
+            </p>
           </div>
           <HeaderAccountActions
             organizationName={currentOrganization.organization_name}
