@@ -86,7 +86,7 @@ export default function OperationalCheckGuide() {
         </p>
         <h2 className="mt-1 text-xl font-bold">運用チェック項目</h2>
         <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-          正常時に見る場所と、異常時に疑う原因をまとめています。全エラーを手動再現する必要はなく、異常が出た時にこの順で切り分けます。
+          正常時に見る場所と、異常時に疑う原因をまとめています。エラー発生時、お問い合わせにご活用ください。
         </p>
       </div>
 
