@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -120,6 +120,7 @@ export default function DocumentUploadClient({
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [extractingDocumentId, setExtractingDocumentId] = useState<string | null>(null);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isLimitError, setIsLimitError] = useState(false);
@@ -164,11 +165,40 @@ export default function DocumentUploadClient({
     void loadAll();
   }, [loadAll]);
 
-  function setFileList(fileList: FileList | null) {
-    const nextFiles = Array.from(fileList ?? []);
+  function setFilesFromArray(nextFiles: File[]) {
     setFiles(nextFiles);
     if (!title && nextFiles[0]) {
       setTitle(nextFiles[0].name.replace(/\.[^.]+$/, ""));
+    }
+  }
+
+  function setFileList(fileList: FileList | null) {
+    setFilesFromArray(Array.from(fileList ?? []));
+  }
+
+  function handleFileDrag(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer.types.includes("Files")) {
+      setIsDraggingFiles(true);
+    }
+  }
+
+  function handleFileDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDraggingFiles(false);
+    }
+  }
+
+  function handleFileDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFiles(false);
+    const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+    if (droppedFiles.length > 0) {
+      setFilesFromArray(droppedFiles);
     }
   }
 
@@ -380,10 +410,20 @@ export default function DocumentUploadClient({
           </div>
 
           <div>
-            <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center border border-dashed border-[#aeb9aa] bg-[#fbfcf8] px-4 py-8 text-center">
+            <label
+              onDragEnter={handleFileDrag}
+              onDragOver={handleFileDrag}
+              onDragLeave={handleFileDragLeave}
+              onDrop={handleFileDrop}
+              className={`flex min-h-36 cursor-pointer flex-col items-center justify-center border border-dashed px-4 py-8 text-center transition ${
+                isDraggingFiles
+                  ? "border-[#2f5d50] bg-[#edf7ef] ring-2 ring-[#2f5d50]/20"
+                  : "border-[#aeb9aa] bg-[#fbfcf8]"
+              }`}
+            >
               <Upload className="h-8 w-8 text-[#2f5d50]" />
               <span className="mt-3 text-sm font-bold">
-                PDF・画像ファイルを選択
+                PDF・画像ファイルを選択 / ドロップ
               </span>
               <span className="mt-1 text-xs text-[#6b7280]">
                 PDF, PNG, JPEG, WebP, HEIC / 1ファイル30MBまで
