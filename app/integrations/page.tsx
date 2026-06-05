@@ -100,6 +100,18 @@ YDT-Signature: v1=<hex encoded hmac sha256>`;
 const apiAuthHeaderExample = `Authorization: Bearer ydt_live_...
 Accept: application/json`;
 
+const documentsEndpointExample = `GET /api/external/documents?limit=50
+Authorization: Bearer ydt_live_...
+
+Query:
+limit=1..100
+status=uploaded|processing|extracted|approved|completed|failed
+before=2026-06-01T09:00:00.000Z
+updated_since=2026-06-01T00:00:00.000Z
+
+Required scope:
+documents:read`;
+
 const signatureExample = `署名対象文字列:
 <YDT-Timestamp>.<raw request body>
 
@@ -254,6 +266,39 @@ export default async function IntegrationsPage() {
                       <li>不要になったキーは削除ではなく失効として記録します。</li>
                       <li>キー本文は再表示できないため、紛失時は新規発行します。</li>
                       <li>利用範囲はスコープで分け、必要最小限にします。</li>
+                    </ul>
+                  </section>
+                </div>
+              </section>
+
+              <section className="border border-[#d9ded3] bg-white">
+                <div className="border-b border-[#e5e9df] px-5 py-4">
+                  <p className="text-sm font-bold text-[#2f5d50]">
+                    External API
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold">
+                    外部向け読み取りAPI
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                    まずは書類メタデータの参照APIを提供します。原本文やファイルURLは返さず、台帳・BI・管理システム連携で使う項目に限定します。
+                  </p>
+                </div>
+                <div className="grid gap-5 p-5 lg:grid-cols-2">
+                  <section>
+                    <h3 className="text-base font-bold">
+                      書類一覧
+                    </h3>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {documentsEndpointExample}
+                    </pre>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">返却する主な項目</h3>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-[#4b5563]">
+                      <li>書類ID、タイトル、要約、書類種別、状態</li>
+                      <li>書類日付、期限、承認日時、完了日時</li>
+                      <li>取引先名、管理対象、ファイル数、タスク数</li>
+                      <li>最新AI抽出ステータス、作成日時、更新日時</li>
                     </ul>
                   </section>
                 </div>
