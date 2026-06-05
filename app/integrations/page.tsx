@@ -112,6 +112,21 @@ updated_since=2026-06-01T00:00:00.000Z
 Required scope:
 documents:read`;
 
+const tasksEndpointExample = `GET /api/external/tasks?limit=50
+Authorization: Bearer ydt_live_...
+
+Query:
+limit=1..100
+status=todo|in_progress|waiting|done|unnecessary|canceled
+assignee=<member_id>|unassigned
+due=overdue|week|none
+document_id=<document_id>
+before=2026-06-01T09:00:00.000Z
+updated_since=2026-06-01T00:00:00.000Z
+
+Required scope:
+tasks:read`;
+
 const signatureExample = `署名対象文字列:
 <YDT-Timestamp>.<raw request body>
 
@@ -299,6 +314,25 @@ export default async function IntegrationsPage() {
                       <li>書類日付、期限、承認日時、完了日時</li>
                       <li>取引先名、管理対象、ファイル数、タスク数</li>
                       <li>最新AI抽出ステータス、作成日時、更新日時</li>
+                    </ul>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">
+                      タスク一覧
+                    </h3>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {tasksEndpointExample}
+                    </pre>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">
+                      タスクAPIの返却項目
+                    </h3>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-[#4b5563]">
+                      <li>タスクID、タイトル、説明、期限、優先度、状態</li>
+                      <li>関連書類ID、書類タイトル、書類状態</li>
+                      <li>担当者ID、担当者名、担当者メールアドレス</li>
+                      <li>予定リマインド数、次回リマインド日時、作成日時、更新日時</li>
                     </ul>
                   </section>
                 </div>
