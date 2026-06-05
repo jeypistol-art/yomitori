@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { jsonApiError } from "@/lib/api_errors";
 import { query } from "@/lib/db";
 import { requireExternalApiContext } from "@/lib/external_api_auth";
+import type { ExternalApiContext } from "@/lib/external_api_auth";
+import {
+  getErrorStatus,
+  logExternalApiRequest,
+} from "@/lib/external_api_logs";
 
 type ExternalWebhookDeliveryRow = {
   id: string;
@@ -34,8 +39,10 @@ function normalizeText(value: string | null) {
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
+  let context: ExternalApiContext | null = null;
   try {
-    const context = await requireExternalApiContext(request, "webhooks:read");
+    context = await requireExternalApiContext(request, "webhooks:read");
     const { searchParams } = new URL(request.url);
     const limit = normalizeLimit(searchParams.get("limit"));
     const endpointId = normalizeText(searchParams.get("endpoint_id"));
@@ -99,6 +106,14 @@ export async function GET(request: Request) {
     const rows = result.rows;
     const nextBefore = rows.length === limit ? rows[rows.length - 1].created_at : null;
 
+    await logExternalApiRequest({
+      request,
+      context,
+      requiredScope: "webhooks:read",
+      statusCode: 200,
+      startedAt,
+    });
+
     return NextResponse.json({
       data: rows,
       meta: {
@@ -107,6 +122,14 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    await logExternalApiRequest({
+      request,
+      context,
+      requiredScope: "webhooks:read",
+      statusCode: getErrorStatus(error),
+      startedAt,
+      error,
+    });
     return jsonApiError(error);
   }
 }

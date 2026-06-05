@@ -15,6 +15,7 @@ import {
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import ApiKeySettingsClient from "@/components/ApiKeySettingsClient";
+import ApiRequestLogsClient from "@/components/ApiRequestLogsClient";
 import FeatureGateNotice from "@/components/FeatureGateNotice";
 import HeaderAccountActions from "@/components/HeaderAccountActions";
 import WebhookSettingsClient from "@/components/WebhookSettingsClient";
@@ -226,6 +227,8 @@ export default async function IntegrationsPage() {
           {canUseApiWebhooks ? (
             <>
               <ApiKeySettingsClient />
+
+              <ApiRequestLogsClient />
 
               <WebhookSettingsClient />
 
