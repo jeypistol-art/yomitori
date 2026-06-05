@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type DragEvent } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -9,6 +10,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   FileText,
+  Loader2,
   MailPlus,
   RefreshCw,
   UploadCloud,
@@ -65,6 +67,13 @@ type ApiItem<T> = {
   data: T;
 };
 
+type UploadResponse = {
+  data: {
+    id: string;
+    title: string;
+  };
+};
+
 const severityClasses: Record<NextAction["severity"], string> = {
   urgent: "border-[#f1c9c3] bg-[#fff5f2]",
   warning: "border-[#f0d6a8] bg-[#fff8eb]",
@@ -83,8 +92,46 @@ const statusLabels: Record<string, string> = {
   archived: "削除済み",
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+const statusClasses: Record<string, string> = {
+  failed: "bg-[#fff5f2] text-[#b42318]",
+  action_required: "bg-[#fff8eb] text-[#9a5b13]",
+  needs_review: "bg-[#fff8eb] text-[#9a5b13]",
+  processing: "bg-[#eef2ff] text-[#3730a3]",
+  uploaded: "bg-[#f3f4f6] text-[#4b5563]",
+  approved: "bg-[#edf2e8] text-[#2f5d50]",
+  completed: "bg-[#f1faf4] text-[#24613f]",
+  archived: "bg-[#f3f4f6] text-[#6b7280]",
+};
+
+const queueItems = [
+  {
+    label: "承認待ち",
+    statKey: "documents_need_review",
+    href: "/unprocessed",
+    title: "AI抽出後、人間の確認が必要な書類です",
+  },
+  {
+    label: "期限切れ",
+    statKey: "overdue_tasks",
+    href: "/tasks?due=overdue",
+    title: "期限を過ぎた未完了タスクです",
+  },
+  {
+    label: "本日期限",
+    statKey: "today_tasks",
+    href: "/tasks?due=week",
+    title: "本日期限の未完了タスクです",
+  },
+  {
+    label: "未割当",
+    statKey: "unassigned_tasks",
+    href: "/tasks?assignee=unassigned",
+    title: "担当者が割り当てられていないタスクです",
+  },
+] as const;
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(
@@ -108,6 +155,143 @@ function NextActionIcon({ severity }: { severity: NextAction["severity"] }) {
     return <AlertTriangle className="h-5 w-5" />;
   }
   return <CheckCircle2 className="h-5 w-5" />;
+}
+
+function getNextActionHint(nextAction: NextAction) {
+  if (nextAction.kind === "failed_documents") {
+    return "未処理一覧で対象書類を開き、ファイル形式・R2保存・AI抽出状況を確認してください。";
+  }
+  if (nextAction.kind === "failed_reminders") {
+    return "送信先メールアドレス、Resend設定、リマインド配信履歴を確認してください。";
+  }
+  return "";
+}
+
+function getDueDateClass(dueDate: string | null) {
+  if (!dueDate) {
+    return "bg-[#fff8eb] text-[#9a5b13]";
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${dueDate}T00:00:00+09:00`);
+  if (Number.isNaN(due.getTime())) {
+    return "bg-[#fff8eb] text-[#9a5b13]";
+  }
+  return due < today
+    ? "bg-[#fff5f2] text-[#b42318]"
+    : "bg-[#fff8eb] text-[#9a5b13]";
+}
+
+function DashboardQuickAdd({ onUploaded }: { onUploaded: () => Promise<void> }) {
+  const router = useRouter();
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function uploadFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+    if (files.length === 0) {
+      return;
+    }
+    setIsUploading(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+      const payload = await fetchJson<UploadResponse>("/api/documents", {
+        method: "POST",
+        body: formData,
+      });
+      await onUploaded();
+      router.push(`/documents/${payload.data.id}/review`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登録に失敗しました");
+    } finally {
+      setIsUploading(false);
+      setIsDraggingFiles(false);
+    }
+  }
+
+  function handleDrag(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer.types.includes("Files")) {
+      setIsDraggingFiles(true);
+    }
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDraggingFiles(false);
+    }
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    void uploadFiles(event.dataTransfer.files);
+  }
+
+  return (
+    <div className="mt-4 grid gap-3">
+      <label
+        onDragEnter={handleDrag}
+        onDragOver={handleDrag}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`flex min-h-28 cursor-pointer flex-col justify-center border border-dashed px-3 py-4 text-sm font-bold transition ${
+          isDraggingFiles
+            ? "border-[#2f5d50] bg-[#edf7ef] ring-2 ring-[#2f5d50]/20"
+            : "border-[#aeb9aa] bg-[#fbfcf8] hover:border-[#2f5d50]"
+        }`}
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-2">
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-[#2f5d50]" />
+            ) : (
+              <UploadCloud className="h-4 w-4 text-[#2f5d50]" />
+            )}
+            PDF・画像を登録
+          </span>
+          <ArrowRight className="h-4 w-4 text-[#2f5d50]" />
+        </span>
+        <span className="mt-2 text-xs font-semibold leading-5 text-[#6b7280]">
+          クリックして選択、またはここにファイルをドロップ
+        </span>
+        <input
+          type="file"
+          multiple
+          accept="application/pdf,image/png,image/jpeg,image/webp,image/heic,image/heif"
+          disabled={isUploading}
+          onChange={(event) => {
+            if (event.target.files) {
+              void uploadFiles(event.target.files);
+            }
+            event.currentTarget.value = "";
+          }}
+          className="hidden"
+        />
+      </label>
+      <Link
+        href="/documents/new"
+        className="flex items-center justify-between gap-3 border border-[#e1e6dc] px-3 py-3 text-sm font-bold text-[#1f2933]"
+      >
+        <span className="inline-flex items-center gap-2">
+          <MailPlus className="h-4 w-4 text-[#2f5d50]" />
+          メール本文を貼り付け
+        </span>
+        <ArrowRight className="h-4 w-4 text-[#2f5d50]" />
+      </Link>
+      {error ? (
+        <p className="border border-[#f1c9c3] bg-[#fff5f2] px-3 py-2 text-xs font-semibold text-[#9a3412]">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export default function DashboardFocusClient() {
@@ -152,6 +336,7 @@ export default function DashboardFocusClient() {
 
   const { next_action: nextAction, stats, activity, recent_documents: recentDocuments } =
     summary;
+  const nextActionHint = getNextActionHint(nextAction);
 
   return (
     <div className="space-y-5">
@@ -171,9 +356,14 @@ export default function DashboardFocusClient() {
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[#4b5563]">
                 {nextAction.body}
               </p>
+              {nextActionHint ? (
+                <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-[#7c2d12]">
+                  {nextActionHint}
+                </p>
+              ) : null}
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
               onClick={() => void loadSummary()}
@@ -184,7 +374,7 @@ export default function DashboardFocusClient() {
             </button>
             <Link
               href={nextAction.href}
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#2f5d50] px-4 text-sm font-bold text-white"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-[#2f5d50] px-4 text-sm font-bold text-white sm:flex-none"
             >
               {nextAction.cta}
               <ArrowRight className="h-4 w-4" />
@@ -235,28 +425,7 @@ export default function DashboardFocusClient() {
             Quick Add
           </p>
           <h2 className="mt-1 text-xl font-bold">書類をすぐ入れる</h2>
-          <div className="mt-4 grid gap-3">
-            <Link
-              href="/documents/new"
-              className="flex items-center justify-between gap-3 border border-[#e1e6dc] px-3 py-3 text-sm font-bold text-[#1f2933]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <UploadCloud className="h-4 w-4 text-[#2f5d50]" />
-                PDF・画像を登録
-              </span>
-              <ArrowRight className="h-4 w-4 text-[#2f5d50]" />
-            </Link>
-            <Link
-              href="/documents/new"
-              className="flex items-center justify-between gap-3 border border-[#e1e6dc] px-3 py-3 text-sm font-bold text-[#1f2933]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <MailPlus className="h-4 w-4 text-[#2f5d50]" />
-                メール本文を貼り付け
-              </span>
-              <ArrowRight className="h-4 w-4 text-[#2f5d50]" />
-            </Link>
-          </div>
+          <DashboardQuickAdd onUploaded={loadSummary} />
         </div>
       </section>
 
@@ -267,16 +436,17 @@ export default function DashboardFocusClient() {
           </p>
           <h2 className="mt-1 text-xl font-bold">いまの滞留</h2>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            {[
-              ["承認待ち", stats.documents_need_review],
-              ["期限切れ", stats.overdue_tasks],
-              ["本日期限", stats.today_tasks],
-              ["未割当", stats.unassigned_tasks],
-            ].map(([label, value]) => (
-              <div key={label} className="border border-[#e1e6dc] bg-[#fbfcf8] p-3">
-                <p className="text-xs font-bold text-[#6b7280]">{label}</p>
-                <p className="mt-1 text-xl font-bold">{value}</p>
-              </div>
+            {queueItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                title={item.title}
+                aria-label={`${item.label}: ${item.title}`}
+                className="block border border-[#e1e6dc] bg-[#fbfcf8] p-3 transition hover:border-[#2f5d50] hover:bg-[#f1faf4]"
+              >
+                <p className="text-xs font-bold text-[#6b7280]">{item.label}</p>
+                <p className="mt-1 text-xl font-bold">{stats[item.statKey]}</p>
+              </Link>
             ))}
           </div>
         </div>
@@ -311,11 +481,18 @@ export default function DashboardFocusClient() {
                     className="block border border-[#e1e6dc] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
+                      <span
+                        className={`rounded px-2 py-1 text-xs font-bold ${
+                          statusClasses[document.status] ??
+                          "bg-[#edf2e8] text-[#2f5d50]"
+                        }`}
+                      >
                         {statusLabels[document.status] ?? document.status}
                       </span>
                       {document.due_date ? (
-                        <span className="text-xs font-bold text-[#9a5b13]">
+                        <span
+                          className={`rounded px-2 py-1 text-xs font-bold ${getDueDateClass(document.due_date)}`}
+                        >
                           期限 {document.due_date}
                         </span>
                       ) : null}

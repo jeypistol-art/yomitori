@@ -33,6 +33,8 @@ export default async function DashboardPage() {
     currentOrganization.plan_code,
     "api_webhooks"
   );
+  const canManageApiWebhooks =
+    canUseApiWebhooks && ["owner", "admin"].includes(currentOrganization.role);
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-6 py-8 text-[#1f2933]">
@@ -94,7 +96,7 @@ export default async function DashboardPage() {
               <Database className="h-4 w-4" />
               台帳設定
             </Link>
-            {canUseApiWebhooks ? (
+            {canManageApiWebhooks ? (
               <Link
                 href="/integrations"
                 className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
@@ -119,7 +121,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mb-4">
-          <UsageSummaryClient />
+          <UsageSummaryClient compact />
         </div>
 
         <div className="mb-4">
@@ -137,7 +139,7 @@ export default async function DashboardPage() {
             ["登録済み書類", "登録済み書類の一覧", "/documents/new"],
             ["利用状況", "月次上限・追加パック・プラン", "/usage"],
             ["監査ログ", "承認・削除・通知の証跡", "/audit-logs"],
-            ...(canUseApiWebhooks
+            ...(canManageApiWebhooks
               ? [["API/Webhook", "外部システム連携の仕様", "/integrations"]]
               : []),
           ].map(([title, body, href]) => (
