@@ -5,6 +5,7 @@ import {
   BellRing,
   ChevronLeft,
   ClipboardCheck,
+  Code2,
   FileText,
   KeyRound,
   RotateCcw,
@@ -56,6 +57,12 @@ const webhookEvents = [
     body: "担当者へメール通知が送信された時点で通知します。",
     icon: BellRing,
   },
+  {
+    event: "webhook.test",
+    title: "テスト送信",
+    body: "送信先一覧のテスト送信ボタンからのみ送信します。実イベント購読には使いません。",
+    icon: Code2,
+  },
 ];
 
 const payloadExample = `{
@@ -80,6 +87,50 @@ const payloadExample = `{
       }
     ]
   }
+}`;
+
+const headerExample = `Content-Type: application/json
+User-Agent: YOMITORI-DocuTask-Webhooks/1.0
+YDT-Event-Id: evt_ydt_...
+YDT-Event-Type: document.approved
+YDT-Timestamp: 2026-06-01T09:00:00.000Z
+YDT-Signature: v1=<hex encoded hmac sha256>`;
+
+const signatureExample = `署名対象文字列:
+<YDT-Timestamp>.<raw request body>
+
+署名方式:
+HMAC-SHA256(secret, signed_payload)
+
+比較値:
+YDT-Signature === "v1=" + hex_digest`;
+
+const nodeVerificationExample = `import crypto from "node:crypto";
+
+export function verifyYomitoriWebhook({
+  rawBody,
+  timestamp,
+  signatureHeader,
+  secret,
+}: {
+  rawBody: string;
+  timestamp: string;
+  signatureHeader: string;
+  secret: string;
+}) {
+  const expected =
+    "v1=" +
+    crypto
+      .createHmac("sha256", secret)
+      .update(\`\${timestamp}.\${rawBody}\`)
+      .digest("hex");
+
+  const actual = Buffer.from(signatureHeader);
+  const expectedBuffer = Buffer.from(expected);
+  return (
+    actual.length === expectedBuffer.length &&
+    crypto.timingSafeEqual(actual, expectedBuffer)
+  );
 }`;
 
 export default async function IntegrationsPage() {
@@ -233,6 +284,43 @@ export default async function IntegrationsPage() {
                   </section>
                 </aside>
               </div>
+
+              <section className="border border-[#d9ded3] bg-white">
+                <div className="border-b border-[#e5e9df] px-5 py-4">
+                  <p className="text-sm font-bold text-[#2f5d50]">
+                    Receiver Implementation
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold">
+                    受信側実装の要点
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                    受信側は2xxを返すと成功扱いになります。本文をJSONとして処理する前に、raw bodyと共有シークレットで署名検証してください。
+                  </p>
+                </div>
+                <div className="grid gap-5 p-5 lg:grid-cols-2">
+                  <section>
+                    <h3 className="text-base font-bold">送信ヘッダー</h3>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {headerExample}
+                    </pre>
+                  </section>
+                  <section>
+                    <h3 className="text-base font-bold">署名計算式</h3>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {signatureExample}
+                    </pre>
+                  </section>
+                  <section className="lg:col-span-2">
+                    <h3 className="text-base font-bold">Node.js検証例</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                      `rawBody`はJSON.parse前の文字列を渡してください。整形後のJSONで検証すると署名が一致しません。
+                    </p>
+                    <pre className="mt-3 overflow-x-auto border border-[#e1e6dc] bg-[#101814] p-4 text-xs leading-6 text-[#e7eee9]">
+                      {nodeVerificationExample}
+                    </pre>
+                  </section>
+                </div>
+              </section>
             </>
           ) : null}
         </div>
