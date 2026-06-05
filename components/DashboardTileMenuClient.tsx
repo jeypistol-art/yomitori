@@ -29,6 +29,7 @@ type TileItem = {
   body: string;
   href: string;
   badge?: number;
+  badgeTone?: "review" | "neutral" | "urgent" | "muted";
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -42,12 +43,29 @@ async function fetchJson<T>(url: string): Promise<T> {
   return payload as T;
 }
 
-function CountBadge({ count }: { count?: number }) {
+const badgeToneClasses: Record<NonNullable<TileItem["badgeTone"]>, string> = {
+  review: "bg-[#fff8eb] text-[#9a5b13] ring-[#f0d6a8]",
+  neutral: "bg-[#eff6ff] text-[#1d4ed8] ring-[#bfdbfe]",
+  urgent: "bg-[#fff5f2] text-[#b42318] ring-[#f1c9c3]",
+  muted: "bg-[#f3f4f6] text-[#4b5563] ring-[#d1d5db]",
+};
+
+function CountBadge({
+  count,
+  tone = "neutral",
+}: {
+  count?: number;
+  tone?: TileItem["badgeTone"];
+}) {
   if (!count || count <= 0) {
     return null;
   }
   return (
-    <span className="rounded-full bg-[#2f5d50] px-2 py-0.5 text-xs font-bold text-white">
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-bold ring-1 ${
+        badgeToneClasses[tone ?? "neutral"]
+      }`}
+    >
       {count}件
     </span>
   );
@@ -71,7 +89,7 @@ function TileCard({
     >
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-base font-bold text-[#1f2933]">{item.title}</h2>
-        <CountBadge count={item.badge} />
+        <CountBadge count={item.badge} tone={item.badgeTone} />
       </div>
       <p className="mt-2 text-sm leading-6 text-[#4b5563]">{item.body}</p>
     </Link>
@@ -119,24 +137,28 @@ export default function DashboardTileMenuClient({
       body: "AI抽出後、人間の確認が必要な書類",
       href: "/unprocessed",
       badge: stats?.documents_need_review,
+      badgeTone: "review",
     },
     {
       title: "未処理一覧",
       body: "月次で残っている書類とタスク",
       href: "/unprocessed",
       badge: unprocessedCount,
+      badgeTone: "neutral",
     },
     {
       title: "期限間近",
       body: "今週対応が必要なタスク",
       href: "/tasks?due=week",
       badge: stats?.week_tasks,
+      badgeTone: "urgent",
     },
     {
       title: "リマインド",
       body: "予定されている通知",
       href: "/reminders",
       badge: reminderCount,
+      badgeTone: "muted",
     },
     {
       title: "登録済み書類",

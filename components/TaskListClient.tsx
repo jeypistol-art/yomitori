@@ -89,6 +89,45 @@ function getDueTone(task: TaskItem) {
   return diffDays <= 7 ? "text-[#9a5b13]" : "text-[#2f5d50]";
 }
 
+function getEmptyTaskMessage({
+  dueFilter,
+  assigneeFilter,
+  statusFilter,
+}: {
+  dueFilter: string;
+  assigneeFilter: string;
+  statusFilter: string;
+}) {
+  if (dueFilter === "week") {
+    return {
+      title: "今週対応が必要なタスクはありません",
+      body: "期限間近の対応は片付いています。新しい書類やタスクが出たらここに表示されます。",
+    };
+  }
+  if (dueFilter === "overdue") {
+    return {
+      title: "期限超過のタスクはありません",
+      body: "期限切れの対応は残っていません。通常のタスク一覧で次の予定を確認できます。",
+    };
+  }
+  if (assigneeFilter === "unassigned") {
+    return {
+      title: "担当者未設定のタスクはありません",
+      body: "担当者の割り当てが必要なタスクは残っていません。",
+    };
+  }
+  if (statusFilter === "done") {
+    return {
+      title: "完了済みタスクはまだありません",
+      body: "タスクを完了すると、この条件で確認できます。",
+    };
+  }
+  return {
+    title: "タスクはありません",
+    body: "今すぐ対応が必要なタスクはありません。新しい書類からタスクが作成されるとここに表示されます。",
+  };
+}
+
 type TaskListClientProps = {
   canAssignTeamTasks: boolean;
   initialAssigneeFilter?: string;
@@ -160,6 +199,11 @@ export default function TaskListClient({
       unassigned: tasks.filter((task) => !task.assignee_member_id).length,
     };
   }, [tasks]);
+  const emptyTaskMessage = getEmptyTaskMessage({
+    dueFilter,
+    assigneeFilter,
+    statusFilter,
+  });
 
   function startEdit(task: TaskItem) {
     setEditingTaskId(task.id);
@@ -322,8 +366,13 @@ export default function TaskListClient({
               読み込み中
             </div>
           ) : tasks.length === 0 ? (
-            <div className="border border-dashed border-[#cfd6ca] px-4 py-10 text-center text-sm font-semibold text-[#5f6b5f]">
-              タスクはありません
+            <div className="border border-dashed border-[#cfd6ca] px-4 py-10 text-center">
+              <p className="text-sm font-bold text-[#2f5d50]">
+                {emptyTaskMessage.title}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#5f6b5f]">
+                {emptyTaskMessage.body}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
