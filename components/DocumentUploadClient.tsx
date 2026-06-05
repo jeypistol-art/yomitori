@@ -85,6 +85,15 @@ const counterpartyTypeLabels: Record<string, string> = {
   other: "その他",
 };
 
+const documentUploadDraftStorageKey = "yomitori.document_upload_draft.v1";
+
+type DocumentUploadDraft = {
+  title: string;
+  counterpartyId: string;
+  selectedAssetIds: string[];
+  sourceText: string;
+};
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const payload = await response.json().catch(() => ({}));
@@ -102,6 +111,55 @@ function formatFileSize(size: number) {
     return `${(size / 1024 / 1024).toFixed(1)} MB`;
   }
   return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
+function readDocumentUploadDraft(): DocumentUploadDraft | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const raw = window.sessionStorage.getItem(documentUploadDraftStorageKey);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const value = JSON.parse(raw) as Partial<DocumentUploadDraft>;
+    return {
+      title: typeof value.title === "string" ? value.title : "",
+      counterpartyId:
+        typeof value.counterpartyId === "string" ? value.counterpartyId : "",
+      selectedAssetIds: Array.isArray(value.selectedAssetIds)
+        ? value.selectedAssetIds.filter((id): id is string => typeof id === "string")
+        : [],
+      sourceText: typeof value.sourceText === "string" ? value.sourceText : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDocumentUploadDraft(draft: DocumentUploadDraft) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const hasDraft =
+    draft.title.trim().length > 0 ||
+    draft.counterpartyId.length > 0 ||
+    draft.selectedAssetIds.length > 0 ||
+    draft.sourceText.trim().length > 0;
+  if (!hasDraft) {
+    window.sessionStorage.removeItem(documentUploadDraftStorageKey);
+    return;
+  }
+  window.sessionStorage.setItem(
+    documentUploadDraftStorageKey,
+    JSON.stringify(draft)
+  );
+}
+
+function clearDocumentUploadDraft() {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(documentUploadDraftStorageKey);
+  }
 }
 
 export default function DocumentUploadClient({
@@ -124,6 +182,7 @@ export default function DocumentUploadClient({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isLimitError, setIsLimitError] = useState(false);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   const selectedFileSize = useMemo(
     () => files.reduce((total, file) => total + file.size, 0),
@@ -164,6 +223,58 @@ export default function DocumentUploadClient({
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    const draft = readDocumentUploadDraft();
+    if (!draft) {
+      setHasRestoredDraft(true);
+      return;
+    }
+    setTitle(draft.title);
+    setCounterpartyId(draft.counterpartyId);
+    setSelectedAssetIds(draft.selectedAssetIds);
+    setSourceText(draft.sourceText);
+    setMessage("前回の入力途中の内容を復元しました。ファイルは必要に応じて再選択してください。");
+    setHasRestoredDraft(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasRestoredDraft) {
+      return;
+    }
+    writeDocumentUploadDraft({
+      title,
+      counterpartyId: canUseSharedLedger ? counterpartyId : "",
+      selectedAssetIds: canUseSharedLedger ? selectedAssetIds : [],
+      sourceText,
+    });
+  }, [
+    canUseSharedLedger,
+    counterpartyId,
+    hasRestoredDraft,
+    selectedAssetIds,
+    sourceText,
+    title,
+  ]);
+
+  useEffect(() => {
+    if (!canUseSharedLedger || isLoading) {
+      return;
+    }
+    const validAssetIds = new Set(assets.map((asset) => asset.id));
+    setSelectedAssetIds((current) =>
+      current.filter((id) => validAssetIds.has(id))
+    );
+  }, [assets, canUseSharedLedger, isLoading]);
+
+  useEffect(() => {
+    if (!canUseSharedLedger || isLoading || !counterpartyId) {
+      return;
+    }
+    if (!counterparties.some((counterparty) => counterparty.id === counterpartyId)) {
+      setCounterpartyId("");
+    }
+  }, [canUseSharedLedger, counterparties, counterpartyId, isLoading]);
 
   function setFilesFromArray(nextFiles: File[]) {
     setFiles(nextFiles);
@@ -245,6 +356,7 @@ export default function DocumentUploadClient({
       setSelectedAssetIds([]);
       setFiles([]);
       setSourceText("");
+      clearDocumentUploadDraft();
       await loadAll();
     } catch (err) {
       setIsLimitError(err instanceof ClientApiError && err.status === 402);
@@ -312,12 +424,20 @@ export default function DocumentUploadClient({
 
           {canUseSharedLedger ? (
             <>
-              <label className="block text-sm font-semibold">
-                取引先
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">取引先</p>
+                  <Link
+                    href="/master-data?tab=counterparties&return_to=/documents/new"
+                    className="text-xs font-bold text-[#2f5d50]"
+                  >
+                    取引先設定
+                  </Link>
+                </div>
                 <select
                   value={counterpartyId}
                   onChange={(event) => setCounterpartyId(event.target.value)}
-                  className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
+                  className="h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
                 >
                   <option value="">未選択</option>
                   {counterparties.map((counterparty) => (
@@ -326,13 +446,13 @@ export default function DocumentUploadClient({
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
 
               <div>
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold">管理対象</p>
                   <Link
-                    href="/master-data"
+                    href="/master-data?tab=assets&return_to=/documents/new"
                     className="text-xs font-bold text-[#2f5d50]"
                   >
                     台帳設定

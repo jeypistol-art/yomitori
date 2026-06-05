@@ -14,7 +14,25 @@ export const metadata: Metadata = {
   title: "台帳設定",
 };
 
-export default async function MasterDataPage() {
+type MasterDataPageProps = {
+  searchParams: Promise<{
+    tab?: string;
+    return_to?: string;
+  }>;
+};
+
+function normalizeInitialTab(value: string | undefined) {
+  return value === "counterparties" ? "counterparties" : "assets";
+}
+
+function normalizeReturnTo(value: string | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "";
+  }
+  return value;
+}
+
+export default async function MasterDataPage({ searchParams }: MasterDataPageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     redirect("/login");
@@ -32,6 +50,9 @@ export default async function MasterDataPage() {
     currentOrganization.plan_code,
     "branch_ledgers"
   );
+  const resolvedSearchParams = await searchParams;
+  const initialTab = normalizeInitialTab(resolvedSearchParams.tab);
+  const returnTo = normalizeReturnTo(resolvedSearchParams.return_to);
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#1f2933] sm:px-6 lg:px-8">
@@ -67,7 +88,11 @@ export default async function MasterDataPage() {
                 currentPlanCode={currentOrganization.plan_code}
                 featureKey="branch_ledgers"
               />
-              <MasterDataClient canUseBranchLedgers={canUseBranchLedgers} />
+              <MasterDataClient
+                canUseBranchLedgers={canUseBranchLedgers}
+                initialTab={initialTab}
+                returnTo={returnTo}
+              />
             </>
           ) : null}
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Building2,
@@ -102,10 +103,16 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function MasterDataClient({
   canUseBranchLedgers,
+  initialTab = "assets",
+  returnTo = "",
 }: {
   canUseBranchLedgers: boolean;
+  initialTab?: "assets" | "counterparties";
+  returnTo?: string;
 }) {
-  const [activeTab, setActiveTab] = useState<"assets" | "counterparties">("assets");
+  const [activeTab, setActiveTab] = useState<"assets" | "counterparties">(
+    initialTab
+  );
   const [assetView, setAssetView] = useState<"list" | "branch">("list");
   const [assets, setAssets] = useState<ManagedAsset[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
@@ -338,6 +345,14 @@ export default function MasterDataClient({
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
       <section className="border border-[#d9ded3] bg-white p-5">
+        {returnTo ? (
+          <Link
+            href={returnTo}
+            className="mb-4 inline-flex h-9 items-center rounded-md border border-[#d9ded3] px-3 text-xs font-bold text-[#2f5d50]"
+          >
+            書類登録へ戻る
+          </Link>
+        ) : null}
         <div className="mb-5 flex rounded-md border border-[#d9ded3] bg-[#f7f8f5] p-1">
           <button
             type="button"
