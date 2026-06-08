@@ -13,6 +13,7 @@ import { requireAdminWrite } from "@/lib/permissions";
 type CounterpartyRow = {
   id: string;
   counterparty_type: string;
+  counterparty_type_label: string | null;
   name: string;
   contact_name: string | null;
   email: string | null;
@@ -38,6 +39,7 @@ export async function GET() {
       `SELECT
          id,
          counterparty_type::text AS counterparty_type,
+         counterparty_type_label,
          name,
          contact_name,
          email,
@@ -66,10 +68,18 @@ export async function POST(request: Request) {
     requireFeatureAccess(currentOrganization.plan_code, "shared_ledger");
 
     const body = await readJson(request);
+    const requestedCounterpartyType = normalizeCounterpartyType(body.counterparty_type);
+    const requestedCounterpartyTypeLabel = normalizeNullableText(
+      body.counterparty_type_label
+    );
+    const counterpartyType = requestedCounterpartyTypeLabel
+      ? "other"
+      : requestedCounterpartyType;
     const result = await query<CounterpartyRow>(
       `INSERT INTO counterparties (
          organization_id,
          counterparty_type,
+         counterparty_type_label,
          name,
          contact_name,
          email,
@@ -77,10 +87,11 @@ export async function POST(request: Request) {
          address,
          memo
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING
          id,
          counterparty_type::text AS counterparty_type,
+         counterparty_type_label,
          name,
          contact_name,
          email,
@@ -91,7 +102,8 @@ export async function POST(request: Request) {
          updated_at`,
       [
         currentOrganization.organization_id,
-        normalizeCounterpartyType(body.counterparty_type),
+        counterpartyType,
+        counterpartyType === "other" ? requestedCounterpartyTypeLabel : null,
         normalizeRequiredText(body.name, "name"),
         normalizeNullableText(body.contact_name),
         normalizeNullableText(body.email),

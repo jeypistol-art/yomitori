@@ -19,6 +19,7 @@ type ManagedAsset = {
   id: string;
   parent_id: string | null;
   asset_type: string;
+  asset_type_label: string | null;
   name: string;
   code: string | null;
   address: string | null;
@@ -28,6 +29,7 @@ type ManagedAsset = {
 type Counterparty = {
   id: string;
   counterparty_type: string;
+  counterparty_type_label: string | null;
   name: string;
   contact_name: string | null;
   email: string | null;
@@ -69,6 +71,7 @@ const counterpartyTypeLabels: Record<string, string> = {
 const emptyAssetForm = {
   parent_id: "",
   asset_type: "facility",
+  asset_type_label: "",
   name: "",
   code: "",
   address: "",
@@ -77,6 +80,7 @@ const emptyAssetForm = {
 
 const emptyCounterpartyForm = {
   counterparty_type: "municipality",
+  counterparty_type_label: "",
   name: "",
   contact_name: "",
   email: "",
@@ -99,6 +103,39 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     );
   }
   return payload as T;
+}
+
+const addCustomTypeValue = "__add_custom_type__";
+const customTypePrefix = "custom:";
+
+function customTypeValue(label: string) {
+  return `${customTypePrefix}${label}`;
+}
+
+function customTypeLabelFromValue(value: string) {
+  return value.startsWith(customTypePrefix)
+    ? value.slice(customTypePrefix.length)
+    : "";
+}
+
+function getAssetTypeLabel(asset: Pick<ManagedAsset, "asset_type" | "asset_type_label">) {
+  return asset.asset_type_label || assetTypeLabels[asset.asset_type] || asset.asset_type;
+}
+
+function getCounterpartyTypeLabel(
+  counterparty: Pick<Counterparty, "counterparty_type" | "counterparty_type_label">
+) {
+  return (
+    counterparty.counterparty_type_label ||
+    counterpartyTypeLabels[counterparty.counterparty_type] ||
+    counterparty.counterparty_type
+  );
+}
+
+function uniqueSortedLabels(labels: Array<string | null>) {
+  return Array.from(
+    new Set(labels.map((label) => label?.trim()).filter((label): label is string => Boolean(label)))
+  ).sort((a, b) => a.localeCompare(b, "ja"));
 }
 
 export default function MasterDataClient({
@@ -128,6 +165,10 @@ export default function MasterDataClient({
   const assetOptions = useMemo(
     () => Object.entries(assetTypeLabels),
     []
+  );
+  const customAssetTypeOptions = useMemo(
+    () => uniqueSortedLabels(assets.map((asset) => asset.asset_type_label)),
+    [assets]
   );
   const assetById = useMemo(
     () => new Map(assets.map((asset) => [asset.id, asset])),
@@ -179,6 +220,13 @@ export default function MasterDataClient({
     () => Object.entries(counterpartyTypeLabels),
     []
   );
+  const customCounterpartyTypeOptions = useMemo(
+    () =>
+      uniqueSortedLabels(
+        counterparties.map((counterparty) => counterparty.counterparty_type_label)
+      ),
+    [counterparties]
+  );
 
   const loadAll = useCallback(async () => {
     setIsLoading(true);
@@ -215,6 +263,50 @@ export default function MasterDataClient({
   function resetCounterpartyForm() {
     setCounterpartyForm(emptyCounterpartyForm);
     setEditingCounterpartyId(null);
+  }
+
+  function handleAssetTypeChange(value: string) {
+    if (value === addCustomTypeValue) {
+      const label = window.prompt("追加する管理対象の種別名を入力してください。");
+      const trimmed = label?.trim();
+      if (!trimmed) {
+        return;
+      }
+      setAssetForm((form) => ({
+        ...form,
+        asset_type: "other",
+        asset_type_label: trimmed,
+      }));
+      return;
+    }
+    const customLabel = customTypeLabelFromValue(value);
+    setAssetForm((form) => ({
+      ...form,
+      asset_type: customLabel ? "other" : value,
+      asset_type_label: customLabel,
+    }));
+  }
+
+  function handleCounterpartyTypeChange(value: string) {
+    if (value === addCustomTypeValue) {
+      const label = window.prompt("追加する取引先の種別名を入力してください。");
+      const trimmed = label?.trim();
+      if (!trimmed) {
+        return;
+      }
+      setCounterpartyForm((form) => ({
+        ...form,
+        counterparty_type: "other",
+        counterparty_type_label: trimmed,
+      }));
+      return;
+    }
+    const customLabel = customTypeLabelFromValue(value);
+    setCounterpartyForm((form) => ({
+      ...form,
+      counterparty_type: customLabel ? "other" : value,
+      counterparty_type_label: customLabel,
+    }));
   }
 
   async function saveAsset() {
@@ -321,6 +413,7 @@ export default function MasterDataClient({
     setAssetForm({
       parent_id: asset.parent_id ?? "",
       asset_type: asset.asset_type,
+      asset_type_label: asset.asset_type_label ?? "",
       name: asset.name,
       code: asset.code ?? "",
       address: asset.address ?? "",
@@ -333,6 +426,7 @@ export default function MasterDataClient({
     setEditingCounterpartyId(counterparty.id);
     setCounterpartyForm({
       counterparty_type: counterparty.counterparty_type,
+      counterparty_type_label: counterparty.counterparty_type_label ?? "",
       name: counterparty.name,
       contact_name: counterparty.contact_name ?? "",
       email: counterparty.email ?? "",
@@ -400,13 +494,12 @@ export default function MasterDataClient({
             <label className="block text-sm font-semibold">
               種別
               <select
-                value={assetForm.asset_type}
-                onChange={(event) =>
-                  setAssetForm((form) => ({
-                    ...form,
-                    asset_type: event.target.value,
-                  }))
+                value={
+                  assetForm.asset_type_label
+                    ? customTypeValue(assetForm.asset_type_label)
+                    : assetForm.asset_type
                 }
+                onChange={(event) => handleAssetTypeChange(event.target.value)}
                 className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
               >
                 {assetOptions.map(([value, label]) => (
@@ -414,6 +507,12 @@ export default function MasterDataClient({
                     {label}
                   </option>
                 ))}
+                {customAssetTypeOptions.map((label) => (
+                  <option key={label} value={customTypeValue(label)}>
+                    {label}
+                  </option>
+                ))}
+                <option value={addCustomTypeValue}>＋種別を追加</option>
               </select>
             </label>
             {canUseBranchLedgers ? (
@@ -526,13 +625,12 @@ export default function MasterDataClient({
             <label className="block text-sm font-semibold">
               種別
               <select
-                value={counterpartyForm.counterparty_type}
-                onChange={(event) =>
-                  setCounterpartyForm((form) => ({
-                    ...form,
-                    counterparty_type: event.target.value,
-                  }))
+                value={
+                  counterpartyForm.counterparty_type_label
+                    ? customTypeValue(counterpartyForm.counterparty_type_label)
+                    : counterpartyForm.counterparty_type
                 }
+                onChange={(event) => handleCounterpartyTypeChange(event.target.value)}
                 className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
               >
                 {counterpartyOptions.map(([value, label]) => (
@@ -540,6 +638,12 @@ export default function MasterDataClient({
                     {label}
                   </option>
                 ))}
+                {customCounterpartyTypeOptions.map((label) => (
+                  <option key={label} value={customTypeValue(label)}>
+                    {label}
+                  </option>
+                ))}
+                <option value={addCustomTypeValue}>＋種別を追加</option>
               </select>
             </label>
             <label className="block text-sm font-semibold">
@@ -765,8 +869,7 @@ export default function MasterDataClient({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
-                          {counterpartyTypeLabels[counterparty.counterparty_type] ??
-                            counterparty.counterparty_type}
+                          {getCounterpartyTypeLabel(counterparty)}
                         </span>
                         {counterparty.contact_name ? (
                           <span className="text-xs font-semibold text-[#6b7280]">
@@ -823,7 +926,7 @@ function AssetCard({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded bg-[#edf2e8] px-2 py-1 text-xs font-bold text-[#2f5d50]">
-            {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
+            {getAssetTypeLabel(asset)}
           </span>
           {asset.code ? (
             <span className="font-mono text-xs text-[#6b7280]">

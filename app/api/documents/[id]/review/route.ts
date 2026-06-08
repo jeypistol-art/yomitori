@@ -41,6 +41,7 @@ export async function GET(_request: Request, context: RouteContext) {
          d.title,
          d.suggested_title,
          d.document_type::text AS document_type,
+         NULLIF(d.metadata->>'document_type_label', '') AS document_type_label,
          d.source_type::text AS source_type,
          d.status::text AS status,
          d.document_date::text AS document_date,
@@ -111,7 +112,7 @@ export async function GET(_request: Request, context: RouteContext) {
           [currentOrganization.organization_id, id]
         ),
         query(
-          `SELECT ma.id, ma.name, ma.asset_type::text AS asset_type
+          `SELECT ma.id, ma.name, ma.asset_type::text AS asset_type, ma.asset_type_label
            FROM document_assets da
            JOIN managed_assets ma
              ON ma.organization_id = da.organization_id
@@ -174,7 +175,7 @@ export async function GET(_request: Request, context: RouteContext) {
           [currentOrganization.organization_id]
         ),
         query(
-          `SELECT id, asset_type::text AS asset_type, name
+          `SELECT id, asset_type::text AS asset_type, asset_type_label, name
            FROM managed_assets
            WHERE organization_id = $1
              AND deleted_at IS NULL
@@ -182,7 +183,7 @@ export async function GET(_request: Request, context: RouteContext) {
           [currentOrganization.organization_id]
         ),
         query(
-          `SELECT id, counterparty_type::text AS counterparty_type, name
+          `SELECT id, counterparty_type::text AS counterparty_type, counterparty_type_label, name
            FROM counterparties
            WHERE organization_id = $1
              AND deleted_at IS NULL

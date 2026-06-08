@@ -19,6 +19,7 @@ type ManagedAssetRow = {
   id: string;
   parent_id: string | null;
   asset_type: string;
+  asset_type_label: string | null;
   name: string;
   code: string | null;
   address: string | null;
@@ -99,15 +100,20 @@ export async function PATCH(request: Request, context: RouteContext) {
       throw new ApiError(400, "parent_id is invalid");
     }
 
+    const requestedAssetType = normalizeAssetType(body.asset_type);
+    const requestedAssetTypeLabel = normalizeNullableText(body.asset_type_label);
+    const assetType = requestedAssetTypeLabel ? "other" : requestedAssetType;
+
     const result = await query<ManagedAssetRow>(
       `UPDATE managed_assets
        SET
          parent_id = $3,
          asset_type = $4,
-         name = $5,
-         code = $6,
-         address = $7,
-         memo = $8,
+         asset_type_label = $5,
+         name = $6,
+         code = $7,
+         address = $8,
+         memo = $9,
          updated_at = now()
        WHERE id = $1
          AND organization_id = $2
@@ -116,6 +122,7 @@ export async function PATCH(request: Request, context: RouteContext) {
          id,
          parent_id,
          asset_type::text AS asset_type,
+         asset_type_label,
          name,
          code,
          address,
@@ -126,7 +133,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         id,
         currentOrganization.organization_id,
         parentId,
-        normalizeAssetType(body.asset_type),
+        assetType,
+        assetType === "other" ? requestedAssetTypeLabel : null,
         normalizeRequiredText(body.name, "name"),
         normalizeNullableText(body.code),
         normalizeNullableText(body.address),

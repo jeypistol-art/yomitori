@@ -26,6 +26,7 @@ type DocumentRow = {
   summary: string | null;
   due_date: string | null;
   document_type: string;
+  document_type_label: string | null;
   source_type: string;
   status: string;
   counterparty_id: string | null;
@@ -115,6 +116,7 @@ export async function GET() {
          d.summary,
          d.due_date::text AS due_date,
          d.document_type::text AS document_type,
+         NULLIF(d.metadata->>'document_type_label', '') AS document_type_label,
          d.source_type::text AS source_type,
          d.status::text AS status,
          d.counterparty_id,

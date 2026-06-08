@@ -15,6 +15,7 @@ type ManagedAssetRow = {
   id: string;
   parent_id: string | null;
   asset_type: string;
+  asset_type_label: string | null;
   name: string;
   code: string | null;
   address: string | null;
@@ -39,6 +40,7 @@ export async function GET() {
          id,
          parent_id,
          asset_type::text AS asset_type,
+         asset_type_label,
          name,
          code,
          address,
@@ -66,6 +68,9 @@ export async function POST(request: Request) {
 
     const body = await readJson(request);
     const parentId = normalizeNullableText(body.parent_id);
+    const requestedAssetType = normalizeAssetType(body.asset_type);
+    const requestedAssetTypeLabel = normalizeNullableText(body.asset_type_label);
+    const assetType = requestedAssetTypeLabel ? "other" : requestedAssetType;
     if (parentId) {
       requireFeatureAccess(currentOrganization.plan_code, "branch_ledgers");
     }
@@ -84,16 +89,18 @@ export async function POST(request: Request) {
          organization_id,
          parent_id,
          asset_type,
+         asset_type_label,
          name,
          code,
          address,
          memo
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING
          id,
          parent_id,
          asset_type::text AS asset_type,
+         asset_type_label,
          name,
          code,
          address,
@@ -103,7 +110,8 @@ export async function POST(request: Request) {
       [
         currentOrganization.organization_id,
         parentId,
-        normalizeAssetType(body.asset_type),
+        assetType,
+        assetType === "other" ? requestedAssetTypeLabel : null,
         normalizeRequiredText(body.name, "name"),
         normalizeNullableText(body.code),
         normalizeNullableText(body.address),

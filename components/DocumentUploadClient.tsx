@@ -18,6 +18,7 @@ import UsageSummaryClient from "@/components/UsageSummaryClient";
 type ManagedAsset = {
   id: string;
   asset_type: string;
+  asset_type_label: string | null;
   name: string;
   code: string | null;
 };
@@ -25,6 +26,7 @@ type ManagedAsset = {
 type Counterparty = {
   id: string;
   counterparty_type: string;
+  counterparty_type_label: string | null;
   name: string;
 };
 
@@ -35,6 +37,7 @@ type DocumentItem = {
   summary: string | null;
   due_date: string | null;
   document_type: string;
+  document_type_label: string | null;
   source_type: string;
   status: string;
   file_count: number;
@@ -84,6 +87,38 @@ const counterpartyTypeLabels: Record<string, string> = {
   maintenance_company: "メンテナンス会社",
   other: "その他",
 };
+
+const documentTypeLabels: Record<string, string> = {
+  municipal_notice: "行政・自治体通知",
+  contract_renewal: "契約更新案内",
+  lease_renewal: "リース契約更新",
+  insurance_renewal: "保険満期案内",
+  tenant_contract_renewal: "テナント契約更新",
+  legal_change_notice: "法改正に伴う提出物",
+  inspection_report: "点検報告",
+  other: "その他",
+  unknown: "未分類",
+};
+
+function getAssetTypeLabel(asset: ManagedAsset) {
+  return asset.asset_type_label || assetTypeLabels[asset.asset_type] || asset.asset_type;
+}
+
+function getCounterpartyTypeLabel(counterparty: Counterparty) {
+  return (
+    counterparty.counterparty_type_label ||
+    counterpartyTypeLabels[counterparty.counterparty_type] ||
+    counterparty.counterparty_type
+  );
+}
+
+function getDocumentTypeLabel(document: Pick<DocumentItem, "document_type" | "document_type_label">) {
+  return (
+    document.document_type_label ||
+    documentTypeLabels[document.document_type] ||
+    document.document_type
+  );
+}
 
 const documentUploadDraftStorageKey = "yomitori.document_upload_draft.v1";
 
@@ -442,7 +477,7 @@ export default function DocumentUploadClient({
                   <option value="">未選択</option>
                   {counterparties.map((counterparty) => (
                     <option key={counterparty.id} value={counterparty.id}>
-                      {counterparty.name}
+                      {counterparty.name} / {getCounterpartyTypeLabel(counterparty)}
                     </option>
                   ))}
                 </select>
@@ -480,7 +515,7 @@ export default function DocumentUploadClient({
                             {asset.name}
                           </span>
                           <span className="mt-1 block text-xs text-[#6b7280]">
-                            {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
+                            {getAssetTypeLabel(asset)}
                             {asset.code ? ` / ${asset.code}` : ""}
                           </span>
                         </span>
@@ -659,7 +694,7 @@ export default function DocumentUploadClient({
                         {document.status}
                       </span>
                       <span className="rounded bg-[#f3f4f6] px-2 py-1 text-xs font-bold text-[#4b5563]">
-                        {document.document_type}
+                        {getDocumentTypeLabel(document)}
                       </span>
                       <span className="text-xs font-semibold text-[#6b7280]">
                         {document.file_count > 0

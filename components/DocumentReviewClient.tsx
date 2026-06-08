@@ -34,6 +34,7 @@ type Member = {
 type ManagedAsset = {
   id: string;
   asset_type: string;
+  asset_type_label: string | null;
   name: string;
 };
 
@@ -43,6 +44,7 @@ type ReviewPayload = {
     title: string;
     suggested_title: string | null;
     document_type: string;
+    document_type_label: string | null;
     source_type: string;
     status: string;
     due_date: string | null;
@@ -53,7 +55,7 @@ type ReviewPayload = {
     duplicate_count?: number;
   };
   files: ReviewFile[];
-  assets: Array<{ id: string; name: string; asset_type: string }>;
+  assets: Array<{ id: string; name: string; asset_type: string; asset_type_label: string | null }>;
   managed_assets: ManagedAsset[];
   latest_extraction: {
     id: string;
@@ -101,7 +103,7 @@ type DocumentDiffPayload = {
     created_at: string;
     approved_at: string | null;
     counterparty_name: string | null;
-    assets: Array<{ id: string; name: string; asset_type: string }>;
+    assets: Array<{ id: string; name: string; asset_type: string; asset_type_label: string | null }>;
   } | null;
   candidates: DocumentDiffCandidate[];
   match: DocumentDiffMatch | null;
@@ -174,6 +176,27 @@ const diffStatusClassNames: Record<DocumentDiffStatus, string> = {
   changed: "bg-[#fff8eb] text-[#9a5b13]",
   unchanged: "bg-[#f3f4f6] text-[#4b5563]",
 };
+
+const addCustomDocumentTypeValue = "__add_custom_document_type__";
+const customDocumentTypePrefix = "custom:";
+
+function customDocumentTypeValue(label: string) {
+  return `${customDocumentTypePrefix}${label}`;
+}
+
+function customDocumentTypeLabelFromValue(value: string) {
+  return value.startsWith(customDocumentTypePrefix)
+    ? value.slice(customDocumentTypePrefix.length)
+    : "";
+}
+
+function getDocumentTypeLabel(type: string, label?: string | null) {
+  return label || documentTypeLabels[type] || "未分類";
+}
+
+function getAssetTypeLabel(asset: Pick<ManagedAsset, "asset_type" | "asset_type_label">) {
+  return asset.asset_type_label || assetTypeLabels[asset.asset_type] || asset.asset_type;
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -276,6 +299,9 @@ function buildInitialDraft(payload: ReviewPayload): JsonRecord {
   const classification = { ...asRecord(draft.document_classification) };
   if (!classification.document_type) {
     classification.document_type = payload.document.document_type;
+  }
+  if (!classification.document_type_label && payload.document.document_type_label) {
+    classification.document_type_label = payload.document.document_type_label;
   }
   draft.document_classification = classification;
   return draft;
@@ -712,12 +738,30 @@ export default function DocumentReviewClient({
     }));
   }
 
-  function updateClassification(key: string, value: unknown) {
+  function handleDocumentTypeChange(value: string) {
+    if (value === addCustomDocumentTypeValue) {
+      const label = window.prompt("追加する書類種別名を入力してください。");
+      const trimmed = label?.trim();
+      if (!trimmed) {
+        return;
+      }
+      setDraft((current) => ({
+        ...current,
+        document_classification: {
+          ...asRecord(current.document_classification),
+          document_type: "other",
+          document_type_label: trimmed,
+        },
+      }));
+      return;
+    }
+    const customLabel = customDocumentTypeLabelFromValue(value);
     setDraft((current) => ({
       ...current,
       document_classification: {
         ...asRecord(current.document_classification),
-        [key]: value,
+        document_type: customLabel ? "other" : value,
+        document_type_label: customLabel || null,
       },
     }));
   }
@@ -885,7 +929,10 @@ export default function DocumentReviewClient({
                 {payload.document.status}
               </span>
               <span className="rounded bg-[#f3f4f6] px-2 py-1 text-xs font-bold text-[#4b5563]">
-                {documentTypeLabels[asString(classification.document_type)] ?? "未分類"}
+                {getDocumentTypeLabel(
+                  asString(classification.document_type),
+                  asString(classification.document_type_label)
+                )}
               </span>
               {payload.latest_extraction?.overall_confidence ? (
                 <span className="text-xs font-semibold text-[#6b7280]">
@@ -1112,10 +1159,12 @@ export default function DocumentReviewClient({
               <label className="block">
                 <span className="text-xs font-bold text-[#4b5563]">書類種別</span>
                 <select
-                  value={asString(classification.document_type) || "unknown"}
-                  onChange={(event) =>
-                    updateClassification("document_type", event.target.value)
+                  value={
+                    asString(classification.document_type_label)
+                      ? customDocumentTypeValue(asString(classification.document_type_label))
+                      : asString(classification.document_type) || "unknown"
                   }
+                  onChange={(event) => handleDocumentTypeChange(event.target.value)}
                   className="mt-1 h-10 w-full border border-[#d9ded3] bg-white px-3 text-sm outline-none focus:border-[#2f5d50]"
                 >
                   {Object.entries(documentTypeLabels).map(([value, label]) => (
@@ -1123,6 +1172,16 @@ export default function DocumentReviewClient({
                       {label}
                     </option>
                   ))}
+                  {asString(classification.document_type_label) ? (
+                    <option
+                      value={customDocumentTypeValue(
+                        asString(classification.document_type_label)
+                      )}
+                    >
+                      {asString(classification.document_type_label)}
+                    </option>
+                  ) : null}
+                  <option value={addCustomDocumentTypeValue}>＋種別を追加</option>
                 </select>
               </label>
               <DraftTextArea
@@ -1200,7 +1259,7 @@ export default function DocumentReviewClient({
                           {asset.name}
                         </span>
                         <span className="mt-1 block text-xs text-[#6b7280]">
-                          {assetTypeLabels[asset.asset_type] ?? asset.asset_type}
+                          {getAssetTypeLabel(asset)}
                         </span>
                       </span>
                     </label>

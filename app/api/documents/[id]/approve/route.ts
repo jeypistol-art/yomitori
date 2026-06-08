@@ -101,6 +101,11 @@ function extractDocumentType(draft: DraftRecord) {
   return value && documentTypes.has(value) ? value : "unknown";
 }
 
+function extractDocumentTypeLabel(draft: DraftRecord) {
+  const classification = asRecord(draft.document_classification);
+  return normalizeText(classification.document_type_label);
+}
+
 function extractSummary(draft: DraftRecord) {
   const summary = asRecord(draft.document_summary);
   return (
@@ -200,6 +205,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const documentType = extractDocumentType(draft);
+    const documentTypeLabel = extractDocumentTypeLabel(draft);
     const dueDate = extractPrimaryDueDate(draft);
     const summary = extractSummary(draft);
     const keyPoints = extractKeyPoints(draft);
@@ -249,7 +255,10 @@ export async function POST(request: Request, context: RouteContext) {
         jsonString(requiredDocuments),
         jsonString(risks),
         currentOrganization.member_id,
-        jsonString({ approved_from_review: true }),
+        jsonString({
+          approved_from_review: true,
+          document_type_label: documentType === "other" ? documentTypeLabel : null,
+        }),
       ]
     );
 
