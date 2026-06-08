@@ -135,6 +135,16 @@ type ApiItem<T> = {
   data: T;
 };
 
+type ApiList<T> = {
+  data: T[];
+};
+
+type CustomTypeOption = {
+  id: string;
+  option_kind: "asset_type" | "counterparty_type" | "document_type";
+  label: string;
+};
+
 const documentTypeLabels: Record<string, string> = {
   municipal_notice: "行政・自治体通知",
   contract_renewal: "契約更新案内",
@@ -196,6 +206,12 @@ function getDocumentTypeLabel(type: string, label?: string | null) {
 
 function getAssetTypeLabel(asset: Pick<ManagedAsset, "asset_type" | "asset_type_label">) {
   return asset.asset_type_label || assetTypeLabels[asset.asset_type] || asset.asset_type;
+}
+
+function uniqueSortedLabels(labels: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(labels.map((label) => label?.trim()).filter((label): label is string => Boolean(label)))
+  ).sort((a, b) => a.localeCompare(b, "ja"));
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -603,6 +619,44 @@ function DocumentDiffPanel({
   );
 }
 
+function CustomDocumentTypeOptionList({
+  onDelete,
+  options,
+}: {
+  onDelete: (option: CustomTypeOption) => void;
+  options: CustomTypeOption[];
+}) {
+  return (
+    <div className="rounded border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-3">
+      <p className="text-xs font-bold text-[#5f6b5f]">追加済み書類種別</p>
+      {options.length === 0 ? (
+        <p className="mt-2 text-xs text-[#6b7280]">
+          追加した書類種別はありません
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {options.map((option) => (
+            <span
+              key={option.id}
+              className="inline-flex max-w-full items-center gap-2 rounded bg-white px-2 py-1 text-xs font-bold text-[#2f5d50] ring-1 ring-[#d9ded3]"
+            >
+              <span className="truncate">{option.label}</span>
+              <button
+                type="button"
+                title={`${option.label}を削除`}
+                onClick={() => onDelete(option)}
+                className="text-[#9a3412]"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type DocumentReviewClientProps = {
   canAssignTeamTasks: boolean;
   canUseDocumentDiff: boolean;
@@ -626,6 +680,7 @@ export default function DocumentReviewClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDiffLoading, setIsDiffLoading] = useState(false);
   const [documentDiff, setDocumentDiff] = useState<DocumentDiffPayload | null>(null);
+  const [customTypeOptions, setCustomTypeOptions] = useState<CustomTypeOption[]>([]);
   const [diffError, setDiffError] = useState("");
   const [selectedCompareDocumentId, setSelectedCompareDocumentId] = useState("");
   const [createdTasks, setCreatedTasks] = useState<Array<{ id: string; title: string }>>([]);
@@ -673,10 +728,12 @@ export default function DocumentReviewClient({
     setError("");
     setDiffError("");
     try {
-      const result = await fetchJson<ApiItem<ReviewPayload>>(
-        `/api/documents/${documentId}/review`
-      );
+      const [result, customTypePayload] = await Promise.all([
+        fetchJson<ApiItem<ReviewPayload>>(`/api/documents/${documentId}/review`),
+        fetchJson<ApiList<CustomTypeOption>>("/api/custom-type-options"),
+      ]);
       setPayload(result.data);
+      setCustomTypeOptions(customTypePayload.data);
       setDraft(buildInitialDraft(result.data));
       setSelectedAssetIds(result.data.assets.map((asset) => asset.id));
       setSelectedFileId(result.data.files[0]?.id ?? null);
@@ -713,6 +770,19 @@ export default function DocumentReviewClient({
 
   const summary = asRecord(draft.document_summary);
   const classification = asRecord(draft.document_classification);
+  const customDocumentTypeOptions = useMemo(
+    () =>
+      customTypeOptions.filter((option) => option.option_kind === "document_type"),
+    [customTypeOptions]
+  );
+  const customDocumentTypeLabels = useMemo(
+    () =>
+      uniqueSortedLabels([
+        ...customDocumentTypeOptions.map((option) => option.label),
+        asString(classification.document_type_label) || undefined,
+      ]),
+    [classification.document_type_label, customDocumentTypeOptions]
+  );
   const importantDates = asArray(draft.important_dates);
   const primaryDueDate =
     firstDateString(
@@ -738,21 +808,81 @@ export default function DocumentReviewClient({
     }));
   }
 
-  function handleDocumentTypeChange(value: string) {
+  async function createCustomDocumentType(label: string) {
+    const payload = await fetchJson<ApiItem<CustomTypeOption>>(
+      "/api/custom-type-options",
+      {
+        method: "POST",
+        body: JSON.stringify({ option_kind: "document_type", label }),
+      }
+    );
+    setCustomTypeOptions((current) => {
+      const withoutDuplicate = current.filter(
+        (option) =>
+          !(
+            option.option_kind === "document_type" &&
+            option.label.toLocaleLowerCase() === payload.data.label.toLocaleLowerCase()
+          )
+      );
+      return [...withoutDuplicate, payload.data];
+    });
+    return payload.data;
+  }
+
+  async function deleteCustomDocumentType(option: CustomTypeOption) {
+    if (
+      !window.confirm(
+        `${option.label} を削除しますか。この書類種別を使っている登録済み書類は「その他」に戻ります。`
+      )
+    ) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      await fetchJson(`/api/custom-type-options/${option.id}`, { method: "DELETE" });
+      setCustomTypeOptions((current) =>
+        current.filter((currentOption) => currentOption.id !== option.id)
+      );
+      if (
+        asString(classification.document_type_label).toLocaleLowerCase() ===
+        option.label.toLocaleLowerCase()
+      ) {
+        setDraft((current) => ({
+          ...current,
+          document_classification: {
+            ...asRecord(current.document_classification),
+            document_type: "other",
+            document_type_label: null,
+          },
+        }));
+      }
+      setMessage("書類種別を削除しました");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "書類種別の削除に失敗しました");
+    }
+  }
+
+  async function handleDocumentTypeChange(value: string) {
     if (value === addCustomDocumentTypeValue) {
       const label = window.prompt("追加する書類種別名を入力してください。");
       const trimmed = label?.trim();
       if (!trimmed) {
         return;
       }
-      setDraft((current) => ({
-        ...current,
-        document_classification: {
-          ...asRecord(current.document_classification),
-          document_type: "other",
-          document_type_label: trimmed,
-        },
-      }));
+      try {
+        const option = await createCustomDocumentType(trimmed);
+        setDraft((current) => ({
+          ...current,
+          document_classification: {
+            ...asRecord(current.document_classification),
+            document_type: "other",
+            document_type_label: option.label,
+          },
+        }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "書類種別の追加に失敗しました");
+      }
       return;
     }
     const customLabel = customDocumentTypeLabelFromValue(value);
@@ -1164,7 +1294,7 @@ export default function DocumentReviewClient({
                       ? customDocumentTypeValue(asString(classification.document_type_label))
                       : asString(classification.document_type) || "unknown"
                   }
-                  onChange={(event) => handleDocumentTypeChange(event.target.value)}
+                  onChange={(event) => void handleDocumentTypeChange(event.target.value)}
                   className="mt-1 h-10 w-full border border-[#d9ded3] bg-white px-3 text-sm outline-none focus:border-[#2f5d50]"
                 >
                   {Object.entries(documentTypeLabels).map(([value, label]) => (
@@ -1172,18 +1302,18 @@ export default function DocumentReviewClient({
                       {label}
                     </option>
                   ))}
-                  {asString(classification.document_type_label) ? (
-                    <option
-                      value={customDocumentTypeValue(
-                        asString(classification.document_type_label)
-                      )}
-                    >
-                      {asString(classification.document_type_label)}
+                  {customDocumentTypeLabels.map((label) => (
+                    <option key={label} value={customDocumentTypeValue(label)}>
+                      {label}
                     </option>
-                  ) : null}
+                  ))}
                   <option value={addCustomDocumentTypeValue}>＋種別を追加</option>
                 </select>
               </label>
+              <CustomDocumentTypeOptionList
+                options={customDocumentTypeOptions}
+                onDelete={(option) => void deleteCustomDocumentType(option)}
+              />
               <DraftTextArea
                 label="要約"
                 value={asString(summary.one_line_summary)}

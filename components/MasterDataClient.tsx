@@ -46,6 +46,12 @@ type ApiItem<T> = {
   data: T;
 };
 
+type CustomTypeOption = {
+  id: string;
+  option_kind: "asset_type" | "counterparty_type" | "document_type";
+  label: string;
+};
+
 const assetTypeLabels: Record<string, string> = {
   property: "物件",
   facility: "施設",
@@ -132,10 +138,17 @@ function getCounterpartyTypeLabel(
   );
 }
 
-function uniqueSortedLabels(labels: Array<string | null>) {
+function uniqueSortedLabels(labels: Array<string | null | undefined>) {
   return Array.from(
     new Set(labels.map((label) => label?.trim()).filter((label): label is string => Boolean(label)))
   ).sort((a, b) => a.localeCompare(b, "ja"));
+}
+
+function labelsForSelect(options: CustomTypeOption[], currentLabel: string) {
+  return uniqueSortedLabels([
+    ...options.map((option) => option.label),
+    currentLabel || undefined,
+  ]);
 }
 
 export default function MasterDataClient({
@@ -153,6 +166,7 @@ export default function MasterDataClient({
   const [assetView, setAssetView] = useState<"list" | "branch">("list");
   const [assets, setAssets] = useState<ManagedAsset[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [customTypeOptions, setCustomTypeOptions] = useState<CustomTypeOption[]>([]);
   const [assetForm, setAssetForm] = useState(emptyAssetForm);
   const [counterpartyForm, setCounterpartyForm] = useState(emptyCounterpartyForm);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
@@ -167,8 +181,13 @@ export default function MasterDataClient({
     []
   );
   const customAssetTypeOptions = useMemo(
-    () => uniqueSortedLabels(assets.map((asset) => asset.asset_type_label)),
-    [assets]
+    () =>
+      customTypeOptions.filter((option) => option.option_kind === "asset_type"),
+    [customTypeOptions]
+  );
+  const customAssetTypeLabels = useMemo(
+    () => labelsForSelect(customAssetTypeOptions, assetForm.asset_type_label),
+    [assetForm.asset_type_label, customAssetTypeOptions]
   );
   const assetById = useMemo(
     () => new Map(assets.map((asset) => [asset.id, asset])),
@@ -222,22 +241,32 @@ export default function MasterDataClient({
   );
   const customCounterpartyTypeOptions = useMemo(
     () =>
-      uniqueSortedLabels(
-        counterparties.map((counterparty) => counterparty.counterparty_type_label)
+      customTypeOptions.filter(
+        (option) => option.option_kind === "counterparty_type"
       ),
-    [counterparties]
+    [customTypeOptions]
+  );
+  const customCounterpartyTypeLabels = useMemo(
+    () =>
+      labelsForSelect(
+        customCounterpartyTypeOptions,
+        counterpartyForm.counterparty_type_label
+      ),
+    [counterpartyForm.counterparty_type_label, customCounterpartyTypeOptions]
   );
 
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
-      const [assetPayload, counterpartyPayload] = await Promise.all([
+      const [assetPayload, counterpartyPayload, customTypePayload] = await Promise.all([
         fetchJson<ApiList<ManagedAsset>>("/api/managed-assets"),
         fetchJson<ApiList<Counterparty>>("/api/counterparties"),
+        fetchJson<ApiList<CustomTypeOption>>("/api/custom-type-options"),
       ]);
       setAssets(assetPayload.data);
       setCounterparties(counterpartyPayload.data);
+      setCustomTypeOptions(customTypePayload.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
@@ -265,18 +294,87 @@ export default function MasterDataClient({
     setEditingCounterpartyId(null);
   }
 
-  function handleAssetTypeChange(value: string) {
+  async function createCustomTypeOption(
+    optionKind: CustomTypeOption["option_kind"],
+    label: string
+  ) {
+    const payload = await fetchJson<ApiItem<CustomTypeOption>>(
+      "/api/custom-type-options",
+      {
+        method: "POST",
+        body: JSON.stringify({ option_kind: optionKind, label }),
+      }
+    );
+    setCustomTypeOptions((current) => {
+      const withoutDuplicate = current.filter(
+        (option) =>
+          !(
+            option.option_kind === payload.data.option_kind &&
+            option.label.toLocaleLowerCase() === payload.data.label.toLocaleLowerCase()
+          )
+      );
+      return [...withoutDuplicate, payload.data];
+    });
+    return payload.data;
+  }
+
+  async function deleteCustomTypeOption(option: CustomTypeOption) {
+    if (
+      !window.confirm(
+        `${option.label} を削除しますか。この種別を使っている登録済みデータは「その他」に戻ります。`
+      )
+    ) {
+      return;
+    }
+    setError("");
+    setMessage("");
+    try {
+      await fetchJson(`/api/custom-type-options/${option.id}`, { method: "DELETE" });
+      setCustomTypeOptions((current) =>
+        current.filter((currentOption) => currentOption.id !== option.id)
+      );
+      if (
+        option.option_kind === "asset_type" &&
+        assetForm.asset_type_label.toLocaleLowerCase() ===
+          option.label.toLocaleLowerCase()
+      ) {
+        setAssetForm((form) => ({ ...form, asset_type: "other", asset_type_label: "" }));
+      }
+      if (
+        option.option_kind === "counterparty_type" &&
+        counterpartyForm.counterparty_type_label.toLocaleLowerCase() ===
+          option.label.toLocaleLowerCase()
+      ) {
+        setCounterpartyForm((form) => ({
+          ...form,
+          counterparty_type: "other",
+          counterparty_type_label: "",
+        }));
+      }
+      await loadAll();
+      setMessage("種別を削除しました");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "種別の削除に失敗しました");
+    }
+  }
+
+  async function handleAssetTypeChange(value: string) {
     if (value === addCustomTypeValue) {
       const label = window.prompt("追加する管理対象の種別名を入力してください。");
       const trimmed = label?.trim();
       if (!trimmed) {
         return;
       }
-      setAssetForm((form) => ({
-        ...form,
-        asset_type: "other",
-        asset_type_label: trimmed,
-      }));
+      try {
+        const option = await createCustomTypeOption("asset_type", trimmed);
+        setAssetForm((form) => ({
+          ...form,
+          asset_type: "other",
+          asset_type_label: option.label,
+        }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "種別の追加に失敗しました");
+      }
       return;
     }
     const customLabel = customTypeLabelFromValue(value);
@@ -287,18 +385,23 @@ export default function MasterDataClient({
     }));
   }
 
-  function handleCounterpartyTypeChange(value: string) {
+  async function handleCounterpartyTypeChange(value: string) {
     if (value === addCustomTypeValue) {
       const label = window.prompt("追加する取引先の種別名を入力してください。");
       const trimmed = label?.trim();
       if (!trimmed) {
         return;
       }
-      setCounterpartyForm((form) => ({
-        ...form,
-        counterparty_type: "other",
-        counterparty_type_label: trimmed,
-      }));
+      try {
+        const option = await createCustomTypeOption("counterparty_type", trimmed);
+        setCounterpartyForm((form) => ({
+          ...form,
+          counterparty_type: "other",
+          counterparty_type_label: option.label,
+        }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "種別の追加に失敗しました");
+      }
       return;
     }
     const customLabel = customTypeLabelFromValue(value);
@@ -499,7 +602,7 @@ export default function MasterDataClient({
                     ? customTypeValue(assetForm.asset_type_label)
                     : assetForm.asset_type
                 }
-                onChange={(event) => handleAssetTypeChange(event.target.value)}
+                onChange={(event) => void handleAssetTypeChange(event.target.value)}
                 className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
               >
                 {assetOptions.map(([value, label]) => (
@@ -507,7 +610,7 @@ export default function MasterDataClient({
                     {label}
                   </option>
                 ))}
-                {customAssetTypeOptions.map((label) => (
+                {customAssetTypeLabels.map((label) => (
                   <option key={label} value={customTypeValue(label)}>
                     {label}
                   </option>
@@ -515,6 +618,11 @@ export default function MasterDataClient({
                 <option value={addCustomTypeValue}>＋種別を追加</option>
               </select>
             </label>
+            <CustomTypeOptionList
+              emptyText="追加した管理対象種別はありません"
+              options={customAssetTypeOptions}
+              onDelete={(option) => void deleteCustomTypeOption(option)}
+            />
             {canUseBranchLedgers ? (
               <label className="block text-sm font-semibold">
                 上位管理対象
@@ -630,7 +738,7 @@ export default function MasterDataClient({
                     ? customTypeValue(counterpartyForm.counterparty_type_label)
                     : counterpartyForm.counterparty_type
                 }
-                onChange={(event) => handleCounterpartyTypeChange(event.target.value)}
+                onChange={(event) => void handleCounterpartyTypeChange(event.target.value)}
                 className="mt-2 h-11 w-full rounded-md border border-[#cfd6ca] bg-white px-3"
               >
                 {counterpartyOptions.map(([value, label]) => (
@@ -638,7 +746,7 @@ export default function MasterDataClient({
                     {label}
                   </option>
                 ))}
-                {customCounterpartyTypeOptions.map((label) => (
+                {customCounterpartyTypeLabels.map((label) => (
                   <option key={label} value={customTypeValue(label)}>
                     {label}
                   </option>
@@ -646,6 +754,11 @@ export default function MasterDataClient({
                 <option value={addCustomTypeValue}>＋種別を追加</option>
               </select>
             </label>
+            <CustomTypeOptionList
+              emptyText="追加した取引先種別はありません"
+              options={customCounterpartyTypeOptions}
+              onDelete={(option) => void deleteCustomTypeOption(option)}
+            />
             <label className="block text-sm font-semibold">
               名称
               <input
@@ -961,6 +1074,44 @@ function EmptyState({ text }: { text: string }) {
   return (
     <div className="border border-dashed border-[#cfd6ca] px-4 py-10 text-center text-sm font-semibold text-[#5f6b5f]">
       {text}
+    </div>
+  );
+}
+
+function CustomTypeOptionList({
+  emptyText,
+  onDelete,
+  options,
+}: {
+  emptyText: string;
+  onDelete: (option: CustomTypeOption) => void;
+  options: CustomTypeOption[];
+}) {
+  return (
+    <div className="rounded-md border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-3">
+      <p className="text-xs font-bold text-[#5f6b5f]">追加済み種別</p>
+      {options.length === 0 ? (
+        <p className="mt-2 text-xs text-[#6b7280]">{emptyText}</p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {options.map((option) => (
+            <span
+              key={option.id}
+              className="inline-flex max-w-full items-center gap-2 rounded bg-white px-2 py-1 text-xs font-bold text-[#2f5d50] ring-1 ring-[#d9ded3]"
+            >
+              <span className="truncate">{option.label}</span>
+              <button
+                type="button"
+                title={`${option.label}を削除`}
+                onClick={() => onDelete(option)}
+                className="text-[#9a3412]"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
