@@ -173,6 +173,7 @@ export default function DashboardTileMenuClient({
   ];
 
   const settingsTiles: TileItem[] = [
+    { title: "マニュアル", body: "操作手順と画面ごとの説明", href: "/manual" },
     { title: "初期設定", body: "管理対象・担当者・通知設定の準備", href: "/setup" },
     { title: "台帳設定", body: "管理対象と取引先", href: "/master-data" },
     { title: "担当者設定", body: "担当者と権限", href: "/team" },

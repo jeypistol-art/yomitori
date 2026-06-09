@@ -8,6 +8,7 @@ const siteUrl =
 const publicPaths = [
   "/",
   "/enterprise/contact",
+  "/manual",
   "/legal/privacy",
   "/legal/specified-commercial-transactions",
   "/legal/terms",

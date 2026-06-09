@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getLegalConfig } from "@/lib/legal_config";
 
 const legalLinks = [
+  { href: "/manual", label: "マニュアル" },
   { href: "/legal/terms", label: "利用規約" },
   { href: "/legal/privacy", label: "プライバシーポリシー" },
   {

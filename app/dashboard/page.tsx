@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Bell,
+  BookOpen,
   CheckSquare,
   CreditCard,
   Database,
@@ -48,6 +49,13 @@ export default async function DashboardPage() {
             <h1 className="text-3xl font-bold">YOMITORI DocuTask</h1>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/manual"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
+            >
+              <BookOpen className="h-4 w-4" />
+              マニュアル
+            </Link>
             <Link
               href="/setup"
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd6ca] bg-white px-4 text-sm font-semibold text-[#2f5d50]"
