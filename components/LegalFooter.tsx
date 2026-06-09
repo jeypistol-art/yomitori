@@ -41,7 +41,7 @@ export default function LegalFooter() {
           </nav>
         </div>
         <p className="mt-6 border-t border-[#e1e6dc] pt-4 text-[11px] leading-5 text-[#8a9188]">
-          Copyright ©k-Desigh Office │ MoriMori-LAB All rights reserved.
+          Copyright ©k-Design Office │ MoriMori-LAB All rights reserved.
         </p>
       </div>
     </footer>
