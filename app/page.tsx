@@ -3,11 +3,17 @@ import Link from "next/link";
 import {
   ArrowRight,
   BellRing,
+  BriefcaseBusiness,
+  Building2,
   ClipboardCheck,
   FileText,
   GitCompareArrows,
+  LockKeyhole,
+  MessageSquare,
+  Network,
   ScanLine,
   ShieldCheck,
+  Store,
   Users,
 } from "lucide-react";
 
@@ -37,6 +43,30 @@ const workflow = [
     title: "証跡を残す",
     body: "誰が確認し、誰へ割り当て、いつ完了したかを監査ログとして残します。",
     icon: ShieldCheck,
+  },
+];
+
+const targetUseCases = [
+  {
+    title: "施設等の管理会社",
+    label: "現在のメイン",
+    body: "行政からの法令点検通知、エレベーターや消防設備の点検報告書、賃貸の契約更新案内を整理します。",
+    pain: "期限、提出物、担当者、証跡が散らばりやすい書類を一つの流れにします。",
+    icon: Building2,
+  },
+  {
+    title: "多店舗経営",
+    label: "店舗・拠点管理",
+    body: "自治体ごとの営業・助成金関連通知、テナント契約更新、衛生検査報告、本部通達をタスク化します。",
+    pain: "店舗やエリアごとに対応状況が見えにくい問題を、未処理一覧と担当者割当で減らします。",
+    icon: Store,
+  },
+  {
+    title: "士業系の企業",
+    label: "顧問先・期限管理",
+    body: "顧問先から届く役所通知、期限付き申請書類、税務署や労基署からの通達、郵送物を整理します。",
+    pain: "人が読んで転記していた期限と対応事項を、確認可能なタスクとして残します。",
+    icon: BriefcaseBusiness,
   },
 ];
 
@@ -71,6 +101,16 @@ const coreFeatures = [
     body: "過去書類との差分確認と、期限や注意点にもとづく優先処理に対応します。",
     icon: GitCompareArrows,
   },
+  {
+    title: "外部通知への拡張",
+    body: "運用に合わせてSlack、Teams、LINE WORKSなどの通知連携を見据えられます。",
+    icon: MessageSquare,
+  },
+  {
+    title: "API/Webhook",
+    body: "既存台帳、顧客管理、業務システムへ書類やタスクの状態を連携できます。",
+    icon: Network,
+  },
 ];
 
 const planHighlights = [
@@ -92,7 +132,7 @@ const planHighlights = [
   {
     name: "Enterprise",
     price: "49,800円/月〜",
-    body: "分類テンプレ、運用ルール設計、API/Webhook、初期支援込み。",
+    body: "初期設定支援、分類テンプレ、通知ルール、API/Webhookまで運用設計込み。",
   },
 ];
 
@@ -138,7 +178,7 @@ export default function HomePage() {
           <div className="flex flex-1 items-center py-12">
             <div className="max-w-3xl">
               <p className="text-sm font-bold text-[#d7b56d]">
-                不動産・施設管理会社向け 書類タスク化SaaS
+                管理会社・多店舗運営・士業法人向け 書類タスク化SaaS
               </p>
               <h1 className="mt-4 text-5xl font-bold leading-tight tracking-normal md:text-6xl">
                 YOMITORI DocuTask
@@ -147,7 +187,7 @@ export default function HomePage() {
                 書類を、要約・タスク・リマインド・証跡へ。
               </p>
               <p className="mt-6 max-w-2xl text-base leading-8 text-[#e7eee9]">
-                行政通知、契約更新案内、点検報告、メール本文から重要事項を抽出し、
+                行政通知、契約更新案内、点検報告、申請期限付きの郵送物やメール本文から重要事項を抽出し、
                 期限・提出物・担当者・注意点を確認できるタスクへ変換します。
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
@@ -184,6 +224,49 @@ export default function HomePage() {
       </section>
 
       <section className="px-5 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="text-sm font-bold text-[#2f5d50]">Use Cases</p>
+            <h2 className="mt-2 text-3xl font-bold">
+              業界ごとの「面倒な期限付き書類」に対応。
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#4b5563]">
+              YOMITORI DocuTaskは、特定の帳票だけに閉じた入力補助ではありません。
+              行政通知、契約更新、点検報告、郵送物、メール本文など、現場で毎月発生する書類を処理対象にできます。
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {targetUseCases.map((target) => {
+              const Icon = target.icon;
+              return (
+                <article
+                  key={target.title}
+                  className="border border-[#d9ded3] bg-white p-5"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-md bg-[#edf2e8] text-[#2f5d50]">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="rounded-md bg-[#fbf4df] px-2 py-1 text-xs font-bold text-[#8a641f] ring-1 ring-[#ead6a8]">
+                      {target.label}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 text-xl font-bold">{target.title}</h3>
+                  <p className="mt-3 text-sm font-semibold leading-7 text-[#1f2933]">
+                    {target.body}
+                  </p>
+                  <p className="mt-3 border-t border-[#edf0e8] pt-3 text-sm leading-6 text-[#4b5563]">
+                    {target.pain}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-[#d9ded3] bg-[#fbfcf8] px-5 py-14 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
             <p className="text-sm font-bold text-[#2f5d50]">Workflow</p>
@@ -224,12 +307,110 @@ export default function HomePage() {
       </section>
 
       <section className="bg-white px-5 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_1.15fr] lg:items-center">
+          <div>
+            <p className="text-sm font-bold text-[#2f5d50]">Review UI</p>
+            <h2 className="mt-2 text-3xl font-bold">
+              原本とAI抽出結果を、左右で見比べて承認。
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#4b5563]">
+              AIが読み取った内容は、そのまま確定しません。担当者が原本と照合し、
+              必要に応じて期限、担当者、優先度を修正してからタスク化できます。
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {[
+                "2ペインで原本と抽出結果を確認",
+                "期限・提出物・注意点をフォーム化",
+                "担当者とリマインドをその場で設定",
+                "承認後はタスクと監査ログへ反映",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="border border-[#e1e6dc] bg-[#fbfcf8] px-3 py-3 text-sm font-bold text-[#2f5d50]"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border border-[#d9ded3] bg-[#f7f8f5] p-4 shadow-sm">
+            <div className="border border-[#d9ded3] bg-white">
+              <div className="flex items-center justify-between border-b border-[#e1e6dc] px-4 py-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f5d50]">
+                    AI抽出確認・承認
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-[#1f2933]">
+                    防火対象物定期点検報告書の提出について
+                  </p>
+                </div>
+                <span className="rounded-md bg-[#fff8eb] px-2 py-1 text-xs font-bold text-[#9a5b13] ring-1 ring-[#f0d6a8]">
+                  要確認
+                </span>
+              </div>
+              <div className="grid gap-0 md:grid-cols-2">
+                <div className="border-b border-[#e1e6dc] bg-[#f9faf7] p-4 md:border-b-0 md:border-r">
+                  <p className="text-xs font-bold text-[#6b7280]">原本プレビュー</p>
+                  <div className="mt-3 space-y-3 border border-[#d9ded3] bg-white p-4 text-xs leading-6 text-[#4b5563]">
+                    <p className="font-bold text-[#1f2933]">
+                      防火対象物定期点検報告書の提出について
+                    </p>
+                    <p>
+                      管理対象施設について、定期点検報告書を提出してください。
+                    </p>
+                    <p className="border-l-4 border-[#d7b56d] bg-[#fff8eb] px-3 py-2 font-bold text-[#7c4a10]">
+                      提出期限: 2026年8月31日
+                    </p>
+                    <p>
+                      正当な理由なく報告を怠ると、行政指導等の対象となる場合があります。
+                    </p>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs font-bold text-[#6b7280]">AI抽出結果</p>
+                  <div className="mt-3 space-y-3">
+                    {[
+                      ["書類種別", "行政・自治体からの通知"],
+                      ["期限", "2026/08/31"],
+                      ["優先度", "高"],
+                      ["担当者", "設備管理担当"],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-xs font-bold text-[#6b7280]">
+                          {label}
+                        </p>
+                        <div className="mt-1 border border-[#d9ded3] bg-[#fbfcf8] px-3 py-2 text-sm font-bold text-[#1f2933]">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
+                    <div>
+                      <p className="text-xs font-bold text-[#6b7280]">
+                        タスク候補
+                      </p>
+                      <div className="mt-1 border border-[#d9ded3] bg-[#fbfcf8] px-3 py-2 text-sm leading-6 text-[#1f2933]">
+                        定期点検報告書を確認し、提出期限までに自治体へ提出する
+                      </div>
+                    </div>
+                    <div className="rounded-md bg-[#2f5d50] px-4 py-3 text-center text-sm font-bold text-white">
+                      承認してタスク作成
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 py-14 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-3xl">
               <p className="text-sm font-bold text-[#2f5d50]">Features</p>
               <h2 className="mt-2 text-3xl font-bold">
-                管理会社の書類運用に必要な機能を、順番に。
+                期限付き書類を、チームで処理できる形へ。
               </h2>
             </div>
             <Link
@@ -263,16 +444,65 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="bg-white px-5 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <div>
+            <p className="text-sm font-bold text-[#2f5d50]">Security</p>
+            <h2 className="mt-2 text-3xl font-bold">
+              書類を預ける前提の、セキュリティと運用管理。
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#4b5563]">
+              施設情報、契約情報、顧問先情報を含む書類を扱うため、データの保管、権限、証跡を重視しています。
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              {
+                title: "暗号化された保管",
+                body: "アップロードされた書類データは、安全なストレージ上で管理します。",
+                icon: LockKeyhole,
+              },
+              {
+                title: "AIの追加学習に利用しない",
+                body: "通常処理において、書類データをAIの追加学習目的で利用しません。",
+                icon: ShieldCheck,
+              },
+              {
+                title: "権限と証跡",
+                body: "誰が確認し、誰へ割り当て、いつ完了したかを残せます。",
+                icon: ClipboardCheck,
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <article
+                  key={item.title}
+                  className="border border-[#d9ded3] bg-[#fbfcf8] p-5"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-[#2f5d50]">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 text-base font-bold">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-[#4b5563]">
+                    {item.body}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       <section className="px-5 py-14 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
             <p className="text-sm font-bold text-[#2f5d50]">Plans</p>
             <h2 className="mt-2 text-3xl font-bold">
-              高額プランは、会社で回せるから高い。
+              組織の規模と運用に応じた、最適なプラン。
             </h2>
             <p className="mt-4 text-sm leading-7 text-[#4b5563]">
-              価格差はAIの賢さではなく、複数人で運用できること、権限と証跡が残ること、
-              既存業務に組み込めることに置いています。
+              価格差はAIの精度ではなく、チーム運用、権限管理、証跡、
+              既存業務への組み込みに置いています。Enterpriseでは初期設定や運用ルール設計も相談できます。
             </p>
           </div>
 
@@ -299,10 +529,10 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold">
-              まずは、今ある書類の読み取り時間を減らすところから。
+              まずは、今ある期限付き書類の読み取り時間を減らすところから。
             </h2>
             <p className="mt-4 text-sm leading-7 text-[#e7eee9]">
-              管理会社の実務に合わせた分類、通知、台帳設計は導入相談で整理できます。
+              施設管理、多店舗運営、士業系の書類対応に合わせた分類、通知、台帳設計は導入相談で整理できます。
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
