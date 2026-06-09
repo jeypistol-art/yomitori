@@ -17,23 +17,32 @@ export default function LegalFooter() {
 
   return (
     <footer className="border-t border-[#d9ded3] bg-[#f7f8f5] px-4 py-8 text-[#1f2933] sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-bold">{legalConfig.serviceName}</p>
-          <p className="mt-1 text-xs leading-5 text-[#6b7280]">
-            {legalConfig.tagline}
-          </p>
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-bold">{legalConfig.serviceName}</p>
+            <p className="mt-1 text-xs leading-5 text-[#6b7280]">
+              {legalConfig.tagline}
+            </p>
+          </div>
+          <nav
+            aria-label="法務・お問い合わせ"
+            className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-[#2f5d50]"
+          >
+            {legalLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="hover:underline"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
-        <nav
-          aria-label="法務・お問い合わせ"
-          className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-[#2f5d50]"
-        >
-          {legalLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="hover:underline">
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <p className="mt-6 border-t border-[#e1e6dc] pt-4 text-[11px] leading-5 text-[#8a9188]">
+          Copyright ©k-Desigh Office │ MoriMori-LAB All rights reserved.
+        </p>
       </div>
     </footer>
   );
