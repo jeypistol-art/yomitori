@@ -136,6 +136,24 @@ const planHighlights = [
   },
 ];
 
+const faqs = [
+  {
+    question: "手書きの書類や、FAXで届いた歪んだ書類でも読み込めますか？",
+    answer:
+      "傾きやスキャン品質に揺れがある書類も解析対象にできます。ただし書類の状態によって読み取り精度は変わるため、無料相談で実際の書類に近いサンプルを確認するのがおすすめです。",
+  },
+  {
+    question: "最低利用期間や初期費用はありますか？",
+    answer:
+      "Personal、Business、Proは月額費用のみで、最低利用期間の縛りはありません。Enterpriseは初期設定支援や運用設計の範囲により、個別に内容を確認します。",
+  },
+  {
+    question: "読み込める書類の月間件数に制限はありますか？",
+    answer:
+      "プランごとに月間の登録上限を設けています。追加パックで一時的に増やすこともできるため、繁忙期や拠点数に合わせて調整できます。",
+  },
+];
+
 export default function HomePage() {
   return (
     <main className="bg-[#f7f8f5] text-[#1f2933]">
@@ -164,7 +182,7 @@ export default function HomePage() {
                 href="/enterprise/contact"
                 className="rounded-md border border-white/35 bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-white/18"
               >
-                導入相談
+                無料で導入相談
               </Link>
               <Link
                 href="/login"
@@ -202,10 +220,13 @@ export default function HomePage() {
                   href="/enterprise/contact"
                   className="inline-flex items-center gap-2 rounded-md border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur hover:bg-white/18"
                 >
-                  導入相談
+                  無料で導入相談してみる
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-[#e7eee9]">
+                自社の書類が対象になるかを確認できます。強引な営業はありません。オンラインで15分から可能です。
+              </p>
             </div>
           </div>
         </div>
@@ -525,6 +546,44 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="bg-white px-5 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="text-sm font-bold text-[#2f5d50]">FAQ</p>
+            <h2 className="mt-2 text-3xl font-bold">
+              導入前によくある質問。
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#4b5563]">
+              書類の読み取り精度、料金、月間件数など、検討時に確認されやすい内容をまとめています。
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-3">
+            {faqs.map((faq) => (
+              <details
+                key={faq.question}
+                className="group border border-[#d9ded3] bg-[#fbfcf8] px-5 py-4"
+              >
+                <summary className="cursor-pointer list-none text-base font-bold text-[#1f2933]">
+                  <span className="mr-2 text-[#2f5d50]">Q.</span>
+                  {faq.question}
+                  <span className="float-right text-[#2f5d50] group-open:hidden">
+                    ＋
+                  </span>
+                  <span className="float-right hidden text-[#2f5d50] group-open:inline">
+                    −
+                  </span>
+                </summary>
+                <p className="mt-4 border-t border-[#e1e6dc] pt-4 text-sm leading-7 text-[#4b5563]">
+                  <span className="mr-2 font-bold text-[#2f5d50]">A.</span>
+                  {faq.answer}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="bg-[#1f3f37] px-5 py-12 text-white sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-3xl">
@@ -533,6 +592,9 @@ export default function HomePage() {
             </h2>
             <p className="mt-4 text-sm leading-7 text-[#e7eee9]">
               施設管理、多店舗運営、士業系の書類対応に合わせた分類、通知、台帳設計は導入相談で整理できます。
+            </p>
+            <p className="mt-3 text-sm leading-7 text-[#e7eee9]">
+              強引な営業はありません。オンラインで15分から、現在の書類運用を確認できます。
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
@@ -547,7 +609,7 @@ export default function HomePage() {
               href="/enterprise/contact"
               className="inline-flex items-center gap-2 rounded-md border border-white/35 px-5 py-3 text-sm font-bold text-white hover:bg-white/10"
             >
-              導入相談
+              無料で導入相談してみる
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
